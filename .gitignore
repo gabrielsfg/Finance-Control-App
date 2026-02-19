@@ -43,3 +43,25 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment files
+.env
+.env.*
+
+# Android signing
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+
+# Android local config
+android/local.properties
+
+# VSCode local configs
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# Flutter test
+test/.dart_tool/
+
+
