@@ -23,6 +23,9 @@ migrate_working_dir/
 .vscode/launch.json
 .vscode/tasks.json
 
+# Claude Code (local session state — not shared)
+.claude/settings.local.json
+
 # Flutter / Dart / Pub
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -55,6 +58,16 @@ android/local.properties
 
 # iOS signing — managed by Xcode / CI
 ios/Flutter/flutter_export_environment.sh
+
+# macOS — generated files (this project targets Android/iOS only)
+macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Linux — generated files (this project targets Android/iOS only)
+linux/flutter/ephemeral/
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+linux/flutter/generated_plugins.cmake
 
 # Environment / secrets
 .env
