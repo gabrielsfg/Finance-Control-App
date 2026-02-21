@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_spacing.dart';
@@ -27,7 +30,7 @@ class AppBackground extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  const Color(0xFF8B5CF6).withOpacity(t.isDark ? 0.22 : 0.14),
+                  const Color(0xFF8B5CF6).withValues(alpha: t.isDark ? 0.22 : 0.14),
                   Colors.transparent,
                 ]),
               ),
@@ -40,7 +43,7 @@ class AppBackground extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  const Color(0xFF6D28D9).withOpacity(t.isDark ? 0.10 : 0.08),
+                  const Color(0xFF6D28D9).withValues(alpha: t.isDark ? 0.10 : 0.08),
                   Colors.transparent,
                 ]),
               ),
@@ -67,21 +70,28 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    return Container(
-      padding: padding ?? AppSpacing.cardPadding,
-      decoration: BoxDecoration(
-        color: t.isDark
-            ? const Color(0xFF1C1830).withOpacity(0.72)
-            : Colors.white.withOpacity(0.82),
-        borderRadius: borderRadius ?? AppRadius.xlAll,
-        border: Border.all(
-          color: t.isDark
-              ? Colors.white.withOpacity(0.07)
-              : const Color(0xFF7C3AED).withOpacity(0.13),
+    final br = borderRadius ?? AppRadius.xlAll;
+    return ClipRRect(
+      borderRadius: br,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: padding ?? AppSpacing.cardPadding,
+          decoration: BoxDecoration(
+            color: t.isDark
+                ? const Color(0xFF1C1830).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.82),
+            borderRadius: br,
+            border: Border.all(
+              color: t.isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : const Color(0xFF7C3AED).withValues(alpha: 0.13),
+            ),
+            boxShadow: t.isDark ? [] : AppShadows.cardLight,
+          ),
+          child: child,
         ),
-        boxShadow: t.isDark ? [] : AppShadows.cardLight,
       ),
-      child: child,
     );
   }
 }
@@ -110,7 +120,7 @@ class PrimaryButton extends StatelessWidget {
         height: small ? 40 : 48,
         decoration: BoxDecoration(
           gradient: AppColors.primaryGradient,
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.baseAll,
           boxShadow: AppShadows.primaryBtnShadow,
         ),
         child: Row(
@@ -156,11 +166,11 @@ class AppOutlineButton extends StatelessWidget {
     final borderColor = danger
         ? t.error
         : t.isDark
-            ? const Color(0xFF8B5CF6).withOpacity(0.5)
-            : const Color(0xFF7C3AED).withOpacity(0.4);
+            ? const Color(0xFF8B5CF6).withValues(alpha: 0.5)
+            : const Color(0xFF7C3AED).withValues(alpha: 0.4);
     final bgColor = danger
-        ? t.error.withOpacity(t.isDark ? 0.0 : 0.04)
-        : t.primary.withOpacity(t.isDark ? 0.0 : 0.04);
+        ? t.error.withValues(alpha: t.isDark ? 0.0 : 0.04)
+        : t.primary.withValues(alpha: t.isDark ? 0.0 : 0.04);
 
     return GestureDetector(
       onTap: onPressed,
@@ -168,7 +178,7 @@ class AppOutlineButton extends StatelessWidget {
         height: 48,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.baseAll,
           border: Border.all(color: borderColor, width: 1.5),
         ),
         child: Row(
@@ -258,7 +268,7 @@ class _AppInputFieldState extends State<AppInputField> {
               color: t.isDark
                   ? const Color(0xFF1C1830).withValues(alpha: 0.85)
                   : const Color(0xFFEDE9FE).withValues(alpha: 0.5),
-              borderRadius: AppRadius.mdAll,
+              borderRadius: AppRadius.baseAll,
               border: Border.all(
                 color: hasError
                     ? t.error
@@ -295,7 +305,6 @@ class _AppInputFieldState extends State<AppInputField> {
                       hintText: widget.placeholder,
                       hintStyle:
                           AppTextStyles.body(t.txtTertiary).copyWith(fontSize: 14),
-                      // Strip all decoration inherited from the theme
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -352,17 +361,17 @@ class AppProgressBar extends StatelessWidget {
     return Container(
       height: 6,
       decoration: BoxDecoration(
-        borderRadius: AppRadius.fullAll,
+        borderRadius: AppRadius.pillAll,
         color: t.isDark
-            ? Colors.white.withOpacity(0.08)
-            : const Color(0xFF7C3AED).withOpacity(0.1),
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFF7C3AED).withValues(alpha: 0.1),
       ),
       child: FractionallySizedBox(
         alignment: Alignment.centerLeft,
         widthFactor: percent.clamp(0.0, 1.0),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: AppRadius.fullAll,
+            borderRadius: AppRadius.pillAll,
             color: c,
           ),
         ),
@@ -389,16 +398,16 @@ class AppChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         height: 32,
         decoration: BoxDecoration(
-          borderRadius: AppRadius.fullAll,
+          borderRadius: AppRadius.pillAll,
           color: active
-              ? t.primary.withOpacity(t.isDark ? 0.25 : 0.12)
-              : t.surfaceEl.withOpacity(t.isDark ? 0.8 : 0.7),
+              ? t.primary.withValues(alpha: t.isDark ? 0.25 : 0.12)
+              : t.surfaceEl.withValues(alpha: t.isDark ? 0.8 : 0.7),
           border: Border.all(
             color: active
-                ? t.primary.withOpacity(t.isDark ? 0.55 : 0.45)
+                ? t.primary.withValues(alpha: t.isDark ? 0.55 : 0.45)
                 : t.isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : t.primary.withOpacity(0.18),
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : t.primary.withValues(alpha: 0.18),
           ),
         ),
         child: Center(
@@ -431,7 +440,7 @@ class AppFAB extends StatelessWidget {
           gradient: AppColors.primaryGradient,
           boxShadow: AppShadows.fabShadow,
         ),
-        child: const Icon(Icons.add, color: Colors.white, size: 24),
+        child: const Icon(LucideIcons.plus, color: Colors.white, size: 24),
       ),
     );
   }
@@ -450,31 +459,31 @@ class AppNavBar extends StatelessWidget {
     final t = AppThemeTokens.of(context);
 
     const tabs = [
-      (Icons.home_outlined, Icons.home, 'Início'),
-      (Icons.list_outlined, Icons.list, 'Extrato'),
-      (Icons.pie_chart_outline, Icons.pie_chart, 'Budget'),
-      (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Contas'),
-      (Icons.person_outline, Icons.person, 'Perfil'),
+      (LucideIcons.home, 'Início'),
+      (LucideIcons.list, 'Extrato'),
+      (LucideIcons.pieChart, 'Budget'),
+      (LucideIcons.wallet, 'Contas'),
+      (LucideIcons.user, 'Perfil'),
     ];
 
     return Container(
       height: 76,
       decoration: BoxDecoration(
         color: t.isDark
-            ? const Color(0xFF110E1B).withOpacity(0.97)
-            : const Color(0xFFF7F4FF).withOpacity(0.97),
+            ? const Color(0xFF110E1B).withValues(alpha: 0.97)
+            : const Color(0xFFF7F4FF).withValues(alpha: 0.97),
         border: Border(
           top: BorderSide(
             color: t.isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFF7C3AED).withOpacity(0.12),
+                ? Colors.white.withValues(alpha: 0.06)
+                : const Color(0xFF7C3AED).withValues(alpha: 0.12),
           ),
         ),
       ),
       child: Row(
         children: tabs.asMap().entries.map((e) {
           final i = e.key;
-          final (iconOff, iconOn, label) = e.value;
+          final (icon, label) = e.value;
           final isActive = i == activeIndex;
           return Expanded(
             child: GestureDetector(
@@ -496,9 +505,7 @@ class AppNavBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Icon(isActive ? iconOn : iconOff,
-                      size: 22,
-                      color: isActive ? t.primary : t.txtDisabled),
+                  Icon(icon, size: 22, color: isActive ? t.primary : t.txtDisabled),
                   const SizedBox(height: 3),
                   Text(
                     label,
@@ -533,14 +540,13 @@ class AppLogo extends StatelessWidget {
         gradient: AppColors.logoGradient,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.18),
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.18),
             blurRadius: 0, spreadRadius: 4,
           ),
           ...AppShadows.logoShadow,
         ],
       ),
-      child: Icon(Icons.account_balance_wallet,
-          color: Colors.white, size: size * 0.44),
+      child: Icon(LucideIcons.wallet, color: Colors.white, size: size * 0.44),
     );
   }
 }
@@ -562,7 +568,7 @@ class AppAvatar extends StatelessWidget {
         gradient: AppColors.primaryGradient,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.3),
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
             blurRadius: 0, spreadRadius: 2.5,
           ),
         ],
@@ -606,7 +612,7 @@ class ThemeToggleButton extends ConsumerWidget {
               : Colors.black.withValues(alpha: 0.06),
         ),
         child: Icon(
-          isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+          isDark ? LucideIcons.sun : LucideIcons.moon,
           size: 18,
           color: isDark ? Colors.white70 : Colors.black54,
         ),

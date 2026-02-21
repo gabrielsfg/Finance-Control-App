@@ -42,6 +42,7 @@ class AppShell extends StatelessWidget {
     if (location.startsWith('/transactions')) return 1;
     if (location.startsWith('/budgets')) return 2;
     if (location.startsWith('/accounts')) return 3;
+    if (location.startsWith('/profile')) return 4;
     return 0;
   }
 
@@ -55,7 +56,8 @@ class AppShell extends StatelessWidget {
         context.go('/budgets');
       case 3:
         context.go('/accounts');
-      // case 4: profile — TODO
+      case 4:
+        context.go('/profile');
     }
   }
 }

@@ -201,7 +201,7 @@ class _RecurrenceTile extends StatelessWidget {
               : t.isDark
                   ? Colors.white.withValues(alpha: 0.04)
                   : Colors.white.withValues(alpha: 0.7),
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.baseAll,
           border: Border.all(
             color: selected
                 ? t.primary.withValues(alpha: t.isDark ? 0.55 : 0.4)
