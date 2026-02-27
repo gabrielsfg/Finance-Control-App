@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_config.dart';
 import '../storage/token_storage.dart';
 import 'api_endpoints.dart';
 
@@ -22,6 +26,15 @@ class ApiClient {
         },
       ),
     );
+
+    // Allow self-signed certificates on local dev only.
+    if (AppConfig.allowBadCertificate) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = (cert, host, port) => true;
+        return client;
+      };
+    }
 
     _dio.interceptors.addAll([
       _AuthInterceptor(storage),
@@ -53,8 +66,7 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // 401 é tratado nos repositórios/providers para evitar dependência circular.
-    // O token expirado será tratado com lógica de refresh futuramente.
+    // 401 is handled in each provider/notifier to avoid circular dependencies.
     handler.next(err);
   }
 }

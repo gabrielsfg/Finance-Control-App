@@ -1,10 +1,14 @@
-abstract class ApiEndpoints {
-  // Trocar pela URL do servidor em produção via variável de ambiente ou flavor
-  static const String baseUrl = 'http://10.0.2.2:5000'; // Android emulator → localhost
+import '../config/app_config.dart';
 
-  // Auth — UserController (api/user/...)
+abstract class ApiEndpoints {
+  static String get baseUrl => AppConfig.apiBaseUrl;
+
+  // Auth — UserController
   static const String login = '/api/user/login';
   static const String register = '/api/user/register';
+
+  // Main page
+  static const String mainPageSummary = '/api/mainpage/summary';
 
   // Accounts
   static const String accounts = '/api/accounts';

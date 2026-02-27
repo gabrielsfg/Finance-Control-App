@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../data/auth_repository.dart';
+import '../data/dtos/login_request_dto.dart';
 import '../providers/auth_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -64,15 +66,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      // TODO: call authRepository.login() then authNotifier.onLoginSuccess()
-      // final result = await ref.read(authRepositoryProvider).login(
-      //   email: _emailController.text.trim(),
-      //   password: _passwordController.text,
-      // );
-      // TODO: remove dummy bypass before production
+      final token = await ref.read(authRepositoryProvider).login(
+        LoginRequestDto(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        ),
+      );
       await ref.read(authNotifierProvider.notifier).onLoginSuccess(
-        accessToken: 'dummy-access-token',
-        refreshToken: 'dummy-refresh-token',
+        accessToken: token,
+        refreshToken: '',
       );
     } catch (e) {
       setState(() => _globalError = 'E-mail ou senha incorretos.');
