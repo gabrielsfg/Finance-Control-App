@@ -25,11 +25,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
   final _amountController = TextEditingController();
   bool _isInstallment = false;
 
-  // Mock selected values (TODO: replace with picker navigation)
-  String _subcategory = 'Delivery';
-  String _account = 'Nubank';
-  DateTime _date = DateTime(2026, 2, 19);
-  String _description = 'Pizza de pepperoni';
+  String? _subcategory;
+  String? _account;
+  DateTime _date = DateTime.now();
+  String _description = '';
   String _recurrence = 'No';
 
   @override
@@ -121,14 +120,14 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                       children: [
                         _FieldRow(
                           label: 'Subcategory',
-                          value: _subcategory,
+                          value: _subcategory ?? 'Select',
                           onTap: () {
                             // TODO: open subcategory picker
                           },
                         ),
                         _FieldRow(
                           label: 'Account',
-                          value: _account,
+                          value: _account ?? 'Select',
                           onTap: () {
                             // TODO: open account picker
                           },

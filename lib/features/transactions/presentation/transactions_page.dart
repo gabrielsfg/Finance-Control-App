@@ -8,121 +8,6 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/transaction_item.dart';
 
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kIncome  = 520000; // R$ 5.200,00
-const _kExpense = 135248; // R$ 1.352,48
-const _kBalance = 384752; // R$ 3.847,52
-
-final _kGroups = [
-  TransactionGroup(
-    date: DateTime(2026, 2, 19),
-    items: [
-      TransactionItem(
-        name: 'Breakfast',
-        subtitle: 'Food · Café',
-        amountCents: -1200,
-        emoji: '☕',
-        color: 0xFFF59E0B,
-        date: DateTime(2026, 2, 19),
-        category: 'Food',
-        subcategory: 'Café',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Uber to work',
-        subtitle: 'Transport · Ride',
-        amountCents: -1890,
-        emoji: '🚗',
-        color: 0xFF06B6D4,
-        date: DateTime(2026, 2, 19),
-        category: 'Transport',
-        subcategory: 'Ride',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 18),
-    items: [
-      TransactionItem(
-        name: 'iFood',
-        subtitle: 'Food · Delivery',
-        amountCents: -6790,
-        emoji: '🍔',
-        color: 0xFFEF4444,
-        date: DateTime(2026, 2, 18),
-        category: 'Food',
-        subcategory: 'Delivery',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Salary',
-        subtitle: 'Income · Work',
-        amountCents: 520000,
-        emoji: '💼',
-        color: 0xFF22C55E,
-        date: DateTime(2026, 2, 18),
-        category: 'Income',
-        subcategory: 'Salary',
-        account: 'Nubank',
-        type: 'Income',
-        recurrence: 'Monthly',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 15),
-    items: [
-      TransactionItem(
-        name: 'Rent',
-        subtitle: 'Housing · Rent',
-        amountCents: -180000,
-        emoji: '🏠',
-        color: 0xFF8B5CF6,
-        date: DateTime(2026, 2, 15),
-        category: 'Housing',
-        subcategory: 'Rent',
-        account: 'Nubank',
-        type: 'Expense',
-        recurrence: 'Monthly',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 14),
-    items: [
-      TransactionItem(
-        name: 'Pharmacy',
-        subtitle: 'Health · Medicine',
-        amountCents: -4580,
-        emoji: '💊',
-        color: 0xFFEF4444,
-        date: DateTime(2026, 2, 14),
-        category: 'Health',
-        subcategory: 'Medicine',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Uber',
-        subtitle: 'Transport · Ride',
-        amountCents: -3240,
-        emoji: '🚗',
-        color: 0xFF06B6D4,
-        date: DateTime(2026, 2, 14),
-        category: 'Transport',
-        subcategory: 'Ride',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-    ],
-  ),
-];
-
 // ── Filter enum ────────────────────────────────────────────────────────────
 
 enum _TransactionFilter { all, expenses, income, recurring }
@@ -138,7 +23,7 @@ class TransactionsPage extends StatefulWidget {
 
 class _TransactionsPageState extends State<TransactionsPage> {
   _TransactionFilter _filter = _TransactionFilter.all;
-  DateTime _selectedMonth = DateTime(2026, 2);
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   void _previousMonth() {
     setState(() {
@@ -150,30 +35,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
     setState(() {
       _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     });
-  }
-
-  List<TransactionGroup> get _filteredGroups {
-    if (_filter == _TransactionFilter.all) return _kGroups;
-
-    return _kGroups
-        .map((group) {
-          final filtered = group.items.where((item) {
-            switch (_filter) {
-              case _TransactionFilter.expenses:
-                return item.amountCents < 0;
-              case _TransactionFilter.income:
-                return item.amountCents > 0;
-              case _TransactionFilter.recurring:
-                // TODO: filter by recurring flag when API is connected
-                return false;
-              case _TransactionFilter.all:
-                return true;
-            }
-          }).toList();
-          return TransactionGroup(date: group.date, items: filtered);
-        })
-        .where((g) => g.items.isNotEmpty)
-        .toList();
   }
 
   @override
@@ -191,9 +52,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
             children: [
               const SizedBox(height: 8),
               const _SummaryHeader(
-                income: _kIncome,
-                expense: _kExpense,
-                balance: _kBalance,
+                income: 0,
+                expense: 0,
+                balance: 0,
               ),
               const SizedBox(height: 16),
               _FilterChips(
@@ -207,9 +68,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 onNext: _nextMonth,
               ),
               const SizedBox(height: 8),
-              ..._filteredGroups.map(
-                (group) => _TransactionGroupSection(group: group),
-              ),
               SizedBox(height: bottomPad + 76 + 24),
             ],
           ),

@@ -7,77 +7,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kNetWorth = 1284350; // R$ 12.843,50
-
-const _kAccounts = [
-  _AccountData(
-    id: 1,
-    name: 'Nubank',
-    type: 'Checking',
-    balanceCents: 384752,
-    isDefault: true,
-    excludeFromNetWorth: false,
-    color: Color(0xFF8B5CF6),
-    icon: LucideIcons.creditCard,
-  ),
-  _AccountData(
-    id: 2,
-    name: 'Itaú',
-    type: 'Savings',
-    balanceCents: 750000,
-    isDefault: false,
-    excludeFromNetWorth: false,
-    color: Color(0xFFF59E0B),
-    icon: LucideIcons.building2,
-  ),
-  _AccountData(
-    id: 3,
-    name: 'XP Investimentos',
-    type: 'Investment',
-    balanceCents: 149598,
-    isDefault: false,
-    excludeFromNetWorth: false,
-    color: Color(0xFF06B6D4),
-    icon: LucideIcons.trendingUp,
-  ),
-  _AccountData(
-    id: 4,
-    name: 'Emergency Fund',
-    type: 'Savings',
-    balanceCents: 200000,
-    isDefault: false,
-    excludeFromNetWorth: true,
-    color: Color(0xFF22C55E),
-    icon: LucideIcons.shieldCheck,
-  ),
-];
-
-// ── Model ──────────────────────────────────────────────────────────────────
-
-class _AccountData {
-  final int id;
-  final String name;
-  final String type;
-  final int balanceCents;
-  final bool isDefault;
-  final bool excludeFromNetWorth;
-  final Color color;
-  final IconData icon;
-
-  const _AccountData({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.balanceCents,
-    required this.isDefault,
-    required this.excludeFromNetWorth,
-    required this.color,
-    required this.icon,
-  });
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 class AccountsPage extends StatelessWidget {
@@ -99,9 +28,9 @@ class AccountsPage extends StatelessWidget {
               const SizedBox(height: 8),
               const _Header(),
               const SizedBox(height: 20),
-              const _NetWorthCard(),
+              const _NetWorthCard(netWorthCents: 0, includedCount: 0, excludedCount: 0, totalCount: 0),
               const SizedBox(height: 24),
-              const _AccountsSection(),
+              const _AccountsSection(accounts: []),
               SizedBox(height: bottomPad + 76 + 24),
             ],
           ),
@@ -157,16 +86,21 @@ class _AddAccountButton extends StatelessWidget {
 // ── Net Worth Card ─────────────────────────────────────────────────────────
 
 class _NetWorthCard extends StatelessWidget {
-  const _NetWorthCard();
+  final int netWorthCents;
+  final int includedCount;
+  final int excludedCount;
+  final int totalCount;
+
+  const _NetWorthCard({
+    required this.netWorthCents,
+    required this.includedCount,
+    required this.excludedCount,
+    required this.totalCount,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-
-    final includedCount =
-        _kAccounts.where((a) => !a.excludeFromNetWorth).length;
-    final excludedCount =
-        _kAccounts.where((a) => a.excludeFromNetWorth).length;
 
     return GlassCard(
       child: Column(
@@ -183,7 +117,7 @@ class _NetWorthCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            formatCurrency(_kNetWorth),
+            formatCurrency(netWorthCents),
             textAlign: TextAlign.center,
             style: AppTextStyles.moneyLg(t.txtPrimary).copyWith(fontSize: 34),
           ),
@@ -220,7 +154,7 @@ class _NetWorthCard extends StatelessWidget {
               ),
               _NetWorthStat(
                 label: 'Total',
-                count: _kAccounts.length,
+                count: totalCount,
                 icon: LucideIcons.wallet,
                 color: t.primary,
               ),
@@ -271,7 +205,9 @@ class _NetWorthStat extends StatelessWidget {
 // ── Accounts Section ───────────────────────────────────────────────────────
 
 class _AccountsSection extends StatelessWidget {
-  const _AccountsSection();
+  final List<_AccountViewModel> accounts;
+
+  const _AccountsSection({required this.accounts});
 
   @override
   Widget build(BuildContext context) {
@@ -285,20 +221,44 @@ class _AccountsSection extends StatelessWidget {
             Text('My Accounts', style: AppTextStyles.h3(t.txtPrimary)),
             const Spacer(),
             Text(
-              '${_kAccounts.length} accounts',
+              '${accounts.length} accounts',
               style: AppTextStyles.bodySm(t.txtTertiary),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        ..._kAccounts.map((account) => _AccountCard(data: account)),
+        ...accounts.map((account) => _AccountCard(data: account)),
       ],
     );
   }
 }
 
+// ── Account View Model ─────────────────────────────────────────────────────
+
+class _AccountViewModel {
+  final int id;
+  final String name;
+  final String type;
+  final int balanceCents;
+  final bool isDefault;
+  final bool excludeFromNetWorth;
+  final Color color;
+  final IconData icon;
+
+  const _AccountViewModel({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.balanceCents,
+    required this.isDefault,
+    required this.excludeFromNetWorth,
+    required this.color,
+    required this.icon,
+  });
+}
+
 class _AccountCard extends StatelessWidget {
-  final _AccountData data;
+  final _AccountViewModel data;
 
   const _AccountCard({required this.data});
 

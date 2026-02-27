@@ -8,119 +8,6 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/budget_models.dart';
 
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-final _kBudget = Budget(
-  id: 1,
-  name: 'Fixed Costs',
-  recurrence: 'Monthly',
-  startDate: DateTime(2026, 2, 1),
-  endDate: DateTime(2026, 2, 28),
-  areas: [
-    BudgetArea(
-      id: 1,
-      name: 'Housing',
-      categories: [
-        BudgetCategory(
-          id: 1,
-          name: 'Housing',
-          emoji: '🏠',
-          color: const Color(0xFF8B5CF6),
-          subcategories: [
-            const BudgetSubcategory(
-              id: 1,
-              name: 'Rent',
-              allocatedCents: 180000,
-              spentCents: 180000,
-            ),
-            const BudgetSubcategory(
-              id: 2,
-              name: 'Utilities',
-              allocatedCents: 20000,
-              spentCents: 12400,
-            ),
-          ],
-        ),
-      ],
-    ),
-    BudgetArea(
-      id: 2,
-      name: 'Daily Life',
-      categories: [
-        BudgetCategory(
-          id: 2,
-          name: 'Food',
-          emoji: '🍔',
-          color: const Color(0xFFF59E0B),
-          subcategories: [
-            const BudgetSubcategory(
-              id: 3,
-              name: 'Groceries',
-              allocatedCents: 40000,
-              spentCents: 28500,
-            ),
-            const BudgetSubcategory(
-              id: 4,
-              name: 'Delivery',
-              allocatedCents: 15000,
-              spentCents: 19790,
-            ),
-          ],
-        ),
-        BudgetCategory(
-          id: 3,
-          name: 'Transport',
-          emoji: '🚗',
-          color: const Color(0xFF06B6D4),
-          subcategories: [
-            const BudgetSubcategory(
-              id: 5,
-              name: 'Ride apps',
-              allocatedCents: 12000,
-              spentCents: 8460,
-            ),
-            const BudgetSubcategory(
-              id: 6,
-              name: 'Fuel',
-              allocatedCents: 18000,
-              spentCents: 9100,
-            ),
-          ],
-        ),
-      ],
-    ),
-    BudgetArea(
-      id: 3,
-      name: 'Health',
-      categories: [
-        BudgetCategory(
-          id: 4,
-          name: 'Health',
-          emoji: '❤️',
-          color: const Color(0xFFEF4444),
-          subcategories: [
-            const BudgetSubcategory(
-              id: 7,
-              name: 'Pharmacy',
-              allocatedCents: 10000,
-              spentCents: 4580,
-            ),
-            const BudgetSubcategory(
-              id: 8,
-              name: 'Doctor',
-              allocatedCents: 20000,
-              spentCents: 0,
-            ),
-          ],
-        ),
-      ],
-    ),
-  ],
-);
-
-// ── Demo toggle (TODO: replace with Riverpod provider checking real data) ──
-const _kHasBudget = true;
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 class BudgetsPage extends StatelessWidget {
@@ -128,7 +15,7 @@ class BudgetsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _kHasBudget ? _BudgetView(budget: _kBudget) : const _EmptyState();
+    return const _EmptyState();
   }
 }
 

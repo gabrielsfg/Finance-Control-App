@@ -11,82 +11,6 @@ import '../data/models/budget_models.dart';
 import 'budget_wizard_widgets.dart';
 import 'create_budget_state.dart';
 
-// ── Available categories catalogue (mock — TODO: load from API) ──────────────
-
-final _kAvailableCategories = [
-  DraftCategory(
-    id: 1,
-    name: 'Housing',
-    emoji: '🏠',
-    color: const Color(0xFF8B5CF6),
-    subcategories: [
-      DraftSubcategory(id: 1, name: 'Rent'),
-      DraftSubcategory(id: 2, name: 'Utilities'),
-      DraftSubcategory(id: 3, name: 'Internet'),
-      DraftSubcategory(id: 4, name: 'Maintenance'),
-    ],
-  ),
-  DraftCategory(
-    id: 2,
-    name: 'Food',
-    emoji: '🍔',
-    color: const Color(0xFFF59E0B),
-    subcategories: [
-      DraftSubcategory(id: 5, name: 'Groceries'),
-      DraftSubcategory(id: 6, name: 'Delivery'),
-      DraftSubcategory(id: 7, name: 'Restaurants'),
-      DraftSubcategory(id: 8, name: 'Café'),
-    ],
-  ),
-  DraftCategory(
-    id: 3,
-    name: 'Transport',
-    emoji: '🚗',
-    color: const Color(0xFF06B6D4),
-    subcategories: [
-      DraftSubcategory(id: 9, name: 'Ride apps'),
-      DraftSubcategory(id: 10, name: 'Fuel'),
-      DraftSubcategory(id: 11, name: 'Public transit'),
-      DraftSubcategory(id: 12, name: 'Parking'),
-    ],
-  ),
-  DraftCategory(
-    id: 4,
-    name: 'Health',
-    emoji: '❤️',
-    color: const Color(0xFFEF4444),
-    subcategories: [
-      DraftSubcategory(id: 13, name: 'Pharmacy'),
-      DraftSubcategory(id: 14, name: 'Doctor'),
-      DraftSubcategory(id: 15, name: 'Gym'),
-      DraftSubcategory(id: 16, name: 'Insurance'),
-    ],
-  ),
-  DraftCategory(
-    id: 5,
-    name: 'Education',
-    emoji: '📚',
-    color: const Color(0xFF3B82F6),
-    subcategories: [
-      DraftSubcategory(id: 17, name: 'Courses'),
-      DraftSubcategory(id: 18, name: 'Books'),
-      DraftSubcategory(id: 19, name: 'Software'),
-    ],
-  ),
-  DraftCategory(
-    id: 6,
-    name: 'Leisure',
-    emoji: '🎮',
-    color: const Color(0xFF22C55E),
-    subcategories: [
-      DraftSubcategory(id: 20, name: 'Streaming'),
-      DraftSubcategory(id: 21, name: 'Gaming'),
-      DraftSubcategory(id: 22, name: 'Travel'),
-      DraftSubcategory(id: 23, name: 'Hobbies'),
-    ],
-  ),
-];
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 class CreateBudgetStep2Page extends StatefulWidget {
@@ -198,6 +122,7 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
             .categories
             .map((c) => c.id)
             .toSet(),
+        availableCategories: const [],
         onSelected: (cat) {
           setState(() {
             _areas[areaIndex].categories.add(cat);
@@ -715,16 +640,18 @@ class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
 class _CategoryPickerSheet extends StatelessWidget {
   final Set<int> existingCategoryIds;
   final ValueChanged<DraftCategory> onSelected;
+  final List<DraftCategory> availableCategories;
 
   const _CategoryPickerSheet({
     required this.existingCategoryIds,
     required this.onSelected,
+    required this.availableCategories,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final available = _kAvailableCategories
+    final available = availableCategories
         .where((c) => !existingCategoryIds.contains(c.id))
         .toList();
 
