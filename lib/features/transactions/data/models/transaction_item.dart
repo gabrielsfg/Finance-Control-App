@@ -1,12 +1,10 @@
-import 'package:flutter/material.dart';
-
 /// View model for a single transaction row in the list and detail screen.
 class TransactionItem {
   final String name;
   final String subtitle; // e.g. "Food · Café"
   final int amountCents; // positive = income, negative = expense
-  final IconData icon;
-  final Color color;
+  final String emoji;
+  final int color; // ARGB int, e.g. 0xFF8B5CF6
   final DateTime date;
 
   // Detail-screen fields
@@ -22,7 +20,7 @@ class TransactionItem {
     required this.name,
     required this.subtitle,
     required this.amountCents,
-    required this.icon,
+    required this.emoji,
     required this.color,
     required this.date,
     required this.category,

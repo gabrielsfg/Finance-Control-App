@@ -80,14 +80,15 @@ class TransactionDetailPage extends StatelessWidget {
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
-                                color: transaction.color
+                                color: Color(transaction.color)
                                     .withValues(alpha: 0.18),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(
-                                transaction.icon,
-                                color: transaction.color,
-                                size: 28,
+                              child: Center(
+                                child: Text(
+                                  transaction.emoji,
+                                  style: const TextStyle(fontSize: 28),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 14),

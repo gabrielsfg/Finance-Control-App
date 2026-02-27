@@ -22,6 +22,7 @@ class AppColors {
   static const lightInfo         = Color(0xFF1D4ED8);
   static const lightIncomeBg     = Color(0xFFDCFCE7);
   static const lightExpenseBg    = Color(0xFFFEE2E2);
+  static const lightBudgetNeutral = Color(0xFF4F46E5);
 
   // Dark
   static const darkBg            = Color(0xFF110E1B);
@@ -42,6 +43,7 @@ class AppColors {
   static const darkInfo          = Color(0xFF3B82F6);
   static const darkIncomeBg      = Color(0xFF14532D);
   static const darkExpenseBg     = Color(0xFF7F1D1D);
+  static const darkBudgetNeutral  = Color(0xFF6366F1);
 
   // Gradients
   static const primaryGradient = LinearGradient(
@@ -75,6 +77,7 @@ class AppThemeTokens {
   final Color info;
   final Color incomeBg;
   final Color expenseBg;
+  final Color budgetNeutral;
   final bool isDark;
 
   const AppThemeTokens._({
@@ -95,6 +98,7 @@ class AppThemeTokens {
     required this.info,
     required this.incomeBg,
     required this.expenseBg,
+    required this.budgetNeutral,
     required this.isDark,
   });
 
@@ -116,6 +120,7 @@ class AppThemeTokens {
     info: AppColors.lightInfo,
     incomeBg: AppColors.lightIncomeBg,
     expenseBg: AppColors.lightExpenseBg,
+    budgetNeutral: AppColors.lightBudgetNeutral,
     isDark: false,
   );
 
@@ -137,6 +142,7 @@ class AppThemeTokens {
     info: AppColors.darkInfo,
     incomeBg: AppColors.darkIncomeBg,
     expenseBg: AppColors.darkExpenseBg,
+    budgetNeutral: AppColors.darkBudgetNeutral,
     isDark: true,
   );
 

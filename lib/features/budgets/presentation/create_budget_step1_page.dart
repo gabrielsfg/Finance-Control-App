@@ -11,11 +11,11 @@ import 'create_budget_state.dart';
 // ── Recurrence options ───────────────────────────────────────────────────────
 
 final _kRecurrenceOptions = [
-  ('Monthly', Icons.calendar_month_outlined),
-  ('Weekly', Icons.view_week_outlined),
-  ('Biweekly', Icons.calendar_today_outlined),
-  ('Quarterly', Icons.date_range_outlined),
-  ('Annually', Icons.event_note_outlined),
+  ('Monthly', '📅'),
+  ('Weekly', '📆'),
+  ('Biweekly', '🗓️'),
+  ('Quarterly', '📊'),
+  ('Annually', '🗒️'),
 ];
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -78,8 +78,9 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
                               ? Colors.white.withValues(alpha: 0.08)
                               : t.primary.withValues(alpha: 0.08),
                         ),
-                        child: Icon(Icons.arrow_back,
-                            size: 18, color: t.txtPrimary),
+                        child: Center(
+                          child: Text('←', style: TextStyle(fontSize: 18, color: t.txtPrimary)),
+                        ),
                       ),
                     ),
                     Expanded(
@@ -140,11 +141,11 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
                       ),
                       const SizedBox(height: 10),
                       ..._kRecurrenceOptions.map((option) {
-                        final (label, icon) = option;
+                        final (label, emoji) = option;
                         final isSelected = _recurrence == label;
                         return _RecurrenceTile(
                           label: label,
-                          icon: icon,
+                          emoji: emoji,
                           selected: isSelected,
                           onTap: () => setState(() => _recurrence = label),
                         );
@@ -174,13 +175,13 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
 
 class _RecurrenceTile extends StatelessWidget {
   final String label;
-  final IconData icon;
+  final String emoji;
   final bool selected;
   final VoidCallback onTap;
 
   const _RecurrenceTile({
     required this.label,
-    required this.icon,
+    required this.emoji,
     required this.selected,
     required this.onTap,
   });
@@ -201,7 +202,7 @@ class _RecurrenceTile extends StatelessWidget {
               : t.isDark
                   ? Colors.white.withValues(alpha: 0.04)
                   : Colors.white.withValues(alpha: 0.7),
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.baseAll,
           border: Border.all(
             color: selected
                 ? t.primary.withValues(alpha: t.isDark ? 0.55 : 0.4)
@@ -213,10 +214,12 @@ class _RecurrenceTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: selected ? t.primary : t.txtTertiary,
+            Text(
+              emoji,
+              style: TextStyle(
+                fontSize: 20,
+                color: selected ? t.primary : t.txtTertiary,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -231,7 +234,7 @@ class _RecurrenceTile extends StatelessWidget {
               ),
             ),
             if (selected)
-              Icon(Icons.check_circle, size: 18, color: t.primary),
+              Text('✓', style: TextStyle(fontSize: 18, color: t.primary, fontWeight: FontWeight.w700)),
           ],
         ),
       ),

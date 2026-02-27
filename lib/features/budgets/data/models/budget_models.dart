@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show Color;
 
 // ── Subcategory allocation ────────────────────────────────────────────────
 
@@ -24,14 +24,14 @@ class BudgetSubcategory {
 class BudgetCategory {
   final int id;
   final String name;
-  final IconData icon;
+  final String emoji;
   final Color color;
   final List<BudgetSubcategory> subcategories;
 
   const BudgetCategory({
     required this.id,
     required this.name,
-    required this.icon,
+    required this.emoji,
     required this.color,
     required this.subcategories,
   });
@@ -116,14 +116,14 @@ class DraftSubcategory {
 class DraftCategory {
   final int id;
   final String name;
-  final IconData icon;
+  final String emoji;
   final Color color;
   final List<DraftSubcategory> subcategories;
 
   DraftCategory({
     required this.id,
     required this.name,
-    required this.icon,
+    required this.emoji,
     required this.color,
     required this.subcategories,
   });

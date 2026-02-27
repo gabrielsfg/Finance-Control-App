@@ -212,7 +212,7 @@ class _TypeToggle extends StatelessWidget {
         color: t.isDark
             ? Colors.white.withValues(alpha: 0.06)
             : t.primary.withValues(alpha: 0.06),
-        borderRadius: AppRadius.mdAll,
+        borderRadius: AppRadius.baseAll,
         border: Border.all(
           color: t.isDark
               ? Colors.white.withValues(alpha: 0.08)

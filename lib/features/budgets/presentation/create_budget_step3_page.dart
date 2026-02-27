@@ -50,8 +50,9 @@ class CreateBudgetStep3Page extends StatelessWidget {
                               ? Colors.white.withValues(alpha: 0.08)
                               : t.primary.withValues(alpha: 0.08),
                         ),
-                        child: Icon(Icons.arrow_back,
-                            size: 18, color: t.txtPrimary),
+                        child: Center(
+                          child: Text('←', style: TextStyle(fontSize: 18, color: t.txtPrimary)),
+                        ),
                       ),
                     ),
                     Expanded(
@@ -256,8 +257,7 @@ class _AreaSummaryCardState extends State<_AreaSummaryCard> {
                     AnimatedRotation(
                       turns: _expanded ? 0.5 : 0.0,
                       duration: const Duration(milliseconds: 200),
-                      child: Icon(Icons.expand_more,
-                          size: 20, color: t.txtTertiary),
+                      child: Text('▾', style: TextStyle(fontSize: 20, color: t.txtTertiary, height: 1)),
                     ),
                   ],
                 ),
@@ -328,7 +328,7 @@ class _CategorySummarySectionState extends State<_CategorySummarySection> {
                     color: cat.color.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(cat.icon, color: cat.color, size: 16),
+                  child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 16))),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -349,8 +349,7 @@ class _CategorySummarySectionState extends State<_CategorySummarySection> {
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0.0,
                   duration: const Duration(milliseconds: 200),
-                  child: Icon(Icons.expand_more,
-                      size: 16, color: t.txtDisabled),
+                  child: Text('▾', style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1)),
                 ),
               ],
             ),

@@ -17,7 +17,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 1,
     name: 'Housing',
-    icon: Icons.home_outlined,
+    emoji: '🏠',
     color: const Color(0xFF8B5CF6),
     subcategories: [
       DraftSubcategory(id: 1, name: 'Rent'),
@@ -29,7 +29,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 2,
     name: 'Food',
-    icon: Icons.restaurant_outlined,
+    emoji: '🍔',
     color: const Color(0xFFF59E0B),
     subcategories: [
       DraftSubcategory(id: 5, name: 'Groceries'),
@@ -41,7 +41,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 3,
     name: 'Transport',
-    icon: Icons.directions_car_outlined,
+    emoji: '🚗',
     color: const Color(0xFF06B6D4),
     subcategories: [
       DraftSubcategory(id: 9, name: 'Ride apps'),
@@ -53,7 +53,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 4,
     name: 'Health',
-    icon: Icons.favorite_outline,
+    emoji: '❤️',
     color: const Color(0xFFEF4444),
     subcategories: [
       DraftSubcategory(id: 13, name: 'Pharmacy'),
@@ -65,7 +65,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 5,
     name: 'Education',
-    icon: Icons.school_outlined,
+    emoji: '📚',
     color: const Color(0xFF3B82F6),
     subcategories: [
       DraftSubcategory(id: 17, name: 'Courses'),
@@ -76,7 +76,7 @@ final _kAvailableCategories = [
   DraftCategory(
     id: 6,
     name: 'Leisure',
-    icon: Icons.sports_esports_outlined,
+    emoji: '🎮',
     color: const Color(0xFF22C55E),
     subcategories: [
       DraftSubcategory(id: 20, name: 'Streaming'),
@@ -236,8 +236,12 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                               ? Colors.white.withValues(alpha: 0.08)
                               : t.primary.withValues(alpha: 0.08),
                         ),
-                        child: Icon(Icons.arrow_back,
-                            size: 18, color: t.txtPrimary),
+                        child: Center(
+                          child: Text(
+                            '←',
+                            style: TextStyle(fontSize: 18, color: t.txtPrimary),
+                          ),
+                        ),
                       ),
                     ),
                     Expanded(
@@ -310,7 +314,7 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add, size: 18, color: t.primary),
+                              Text('+', style: TextStyle(fontSize: 20, color: t.primary, height: 1)),
                               const SizedBox(width: 6),
                               Text(
                                 'Add Area',
@@ -417,15 +421,16 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                           shape: BoxShape.circle,
                           color: t.error.withValues(alpha: 0.1),
                         ),
-                        child: Icon(Icons.close, size: 14, color: t.error),
+                        child: Center(
+                          child: Text('×', style: TextStyle(fontSize: 16, color: t.error, height: 1)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     AnimatedRotation(
                       turns: _expanded ? 0.5 : 0.0,
                       duration: const Duration(milliseconds: 200),
-                      child: Icon(Icons.expand_more,
-                          size: 20, color: t.txtTertiary),
+                      child: Text('▾', style: TextStyle(fontSize: 20, color: t.txtTertiary, height: 1)),
                     ),
                   ],
                 ),
@@ -460,7 +465,7 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                       horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      Icon(Icons.add, size: 16, color: t.primary),
+                      Text('+', style: TextStyle(fontSize: 18, color: t.primary, height: 1)),
                       const SizedBox(width: 6),
                       Text(
                         'Add Category',
@@ -525,7 +530,7 @@ class _DraftCategorySectionState extends State<_DraftCategorySection> {
                     color: cat.color.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(cat.icon, color: cat.color, size: 16),
+                  child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 16))),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -550,15 +555,13 @@ class _DraftCategorySectionState extends State<_DraftCategorySection> {
                 ),
                 GestureDetector(
                   onTap: widget.onRemove,
-                  child: Icon(Icons.remove_circle_outline,
-                      size: 18, color: t.error),
+                  child: Text('−', style: TextStyle(fontSize: 20, color: t.error, height: 1)),
                 ),
                 const SizedBox(width: 6),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0.0,
                   duration: const Duration(milliseconds: 200),
-                  child: Icon(Icons.expand_more,
-                      size: 16, color: t.txtDisabled),
+                  child: Text('▾', style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1)),
                 ),
               ],
             ),
@@ -768,7 +771,7 @@ class _CategoryPickerSheet extends StatelessWidget {
                   final copy = DraftCategory(
                     id: cat.id,
                     name: cat.name,
-                    icon: cat.icon,
+                    emoji: cat.emoji,
                     color: cat.color,
                     subcategories: cat.subcategories
                         .map((s) => DraftSubcategory(
@@ -793,7 +796,7 @@ class _CategoryPickerSheet extends StatelessWidget {
                           color: cat.color.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(cat.icon, color: cat.color, size: 18),
+                        child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 18))),
                       ),
                       const SizedBox(width: 12),
                       Text(

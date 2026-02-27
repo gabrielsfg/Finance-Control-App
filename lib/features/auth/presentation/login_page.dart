@@ -233,7 +233,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: t.error.withValues(alpha: t.isDark ? 0.15 : 0.08),
-        borderRadius: AppRadius.mdAll,
+        borderRadius: AppRadius.baseAll,
         border: Border.all(color: t.error.withValues(alpha: 0.35)),
       ),
       child: Row(
