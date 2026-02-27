@@ -23,10 +23,10 @@ const _kBudgetPercent = 0.85;
 const _kBudgetSpent   = 161500; // R$ 1.615,00
 
 const _kCategories = [
-  CategoryPreview('Housing',     Icons.home_outlined,             180000, Color(0xFF8B5CF6)),
-  CategoryPreview('Food',        Icons.restaurant_outlined,        48720, Color(0xFFF59E0B)),
-  CategoryPreview('Transport',   Icons.directions_car_outlined,    21000, Color(0xFF06B6D4)),
-  CategoryPreview('Health',      Icons.favorite_outline,           15600, Color(0xFFEF4444)),
+  CategoryPreview('Housing',   '🏠', 180000, 0xFF8B5CF6),
+  CategoryPreview('Food',      '🍔', 48720,  0xFFF59E0B),
+  CategoryPreview('Transport', '🚗', 21000,  0xFF06B6D4),
+  CategoryPreview('Health',    '❤️', 15600,  0xFFEF4444),
 ];
 
 final _kTransactions = [
@@ -34,8 +34,8 @@ final _kTransactions = [
     name: 'Rent',
     subtitle: 'Housing · Rent',
     amountCents: -180000,
-    icon: Icons.home_outlined,
-    color: const Color(0xFF8B5CF6),
+    emoji: '🏠',
+    color: 0xFF8B5CF6,
     date: DateTime(2026, 2, 15),
     category: 'Housing',
     subcategory: 'Rent',
@@ -47,8 +47,8 @@ final _kTransactions = [
     name: 'iFood',
     subtitle: 'Food · Delivery',
     amountCents: -6790,
-    icon: Icons.restaurant_outlined,
-    color: const Color(0xFFF59E0B),
+    emoji: '🍔',
+    color: 0xFFF59E0B,
     date: DateTime(2026, 2, 18),
     category: 'Food',
     subcategory: 'Delivery',
@@ -59,8 +59,8 @@ final _kTransactions = [
     name: 'Uber',
     subtitle: 'Transport · Ride',
     amountCents: -3240,
-    icon: Icons.directions_car_outlined,
-    color: const Color(0xFF06B6D4),
+    emoji: '🚗',
+    color: 0xFF06B6D4,
     date: DateTime(2026, 2, 14),
     category: 'Transport',
     subcategory: 'Ride',
@@ -71,8 +71,8 @@ final _kTransactions = [
     name: 'Salary',
     subtitle: 'Income · Work',
     amountCents: 520000,
-    icon: Icons.work_outline,
-    color: const Color(0xFF22C55E),
+    emoji: '💼',
+    color: 0xFF22C55E,
     date: DateTime(2026, 2, 18),
     category: 'Income',
     subcategory: 'Salary',
@@ -84,8 +84,8 @@ final _kTransactions = [
     name: 'Pharmacy',
     subtitle: 'Health · Medicine',
     amountCents: -4580,
-    icon: Icons.local_pharmacy_outlined,
-    color: const Color(0xFFEF4444),
+    emoji: '💊',
+    color: 0xFFEF4444,
     date: DateTime(2026, 2, 14),
     category: 'Health',
     subcategory: 'Medicine',
@@ -243,10 +243,9 @@ class _MiniCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                isIncome ? Icons.trending_up : Icons.trending_down,
-                size: 13,
-                color: color,
+              Text(
+                isIncome ? '↑' : '↓',
+                style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 4),
               Text(
@@ -394,10 +393,12 @@ class _CategoryChip extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.15),
+              color: Color(data.color).withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(data.icon, color: data.color, size: 22),
+            child: Center(
+              child: Text(data.emoji, style: const TextStyle(fontSize: 22)),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -487,10 +488,12 @@ class _TransactionItem extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: data.color.withValues(alpha: 0.15),
+                    color: Color(data.color).withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(data.icon, color: data.color, size: 20),
+                  child: Center(
+                    child: Text(data.emoji, style: const TextStyle(fontSize: 20)),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

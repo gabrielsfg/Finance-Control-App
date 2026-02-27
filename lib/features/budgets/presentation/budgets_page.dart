@@ -24,7 +24,7 @@ final _kBudget = Budget(
         BudgetCategory(
           id: 1,
           name: 'Housing',
-          icon: Icons.home_outlined,
+          emoji: '🏠',
           color: const Color(0xFF8B5CF6),
           subcategories: [
             const BudgetSubcategory(
@@ -50,7 +50,7 @@ final _kBudget = Budget(
         BudgetCategory(
           id: 2,
           name: 'Food',
-          icon: Icons.restaurant_outlined,
+          emoji: '🍔',
           color: const Color(0xFFF59E0B),
           subcategories: [
             const BudgetSubcategory(
@@ -70,7 +70,7 @@ final _kBudget = Budget(
         BudgetCategory(
           id: 3,
           name: 'Transport',
-          icon: Icons.directions_car_outlined,
+          emoji: '🚗',
           color: const Color(0xFF06B6D4),
           subcategories: [
             const BudgetSubcategory(
@@ -96,7 +96,7 @@ final _kBudget = Budget(
         BudgetCategory(
           id: 4,
           name: 'Health',
-          icon: Icons.favorite_outline,
+          emoji: '❤️',
           color: const Color(0xFFEF4444),
           subcategories: [
             const BudgetSubcategory(
@@ -173,10 +173,8 @@ class _EmptyState extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: t.primary.withValues(alpha: 0.1),
                         ),
-                        child: Icon(
-                          Icons.pie_chart_outline,
-                          size: 44,
-                          color: t.primary,
+                        child: Center(
+                          child: Text('📊', style: const TextStyle(fontSize: 44)),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -199,7 +197,7 @@ class _EmptyState extends StatelessWidget {
                       const SizedBox(height: 32),
                       PrimaryButton(
                         label: 'Create Budget',
-                        icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                        icon: const Text('+', style: TextStyle(color: Colors.white, fontSize: 20, height: 1)),
                         onPressed: () => context.push('/budgets/create/step1'),
                       ),
                     ],
@@ -257,7 +255,17 @@ class _BudgetView extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: t.primary.withValues(alpha: 0.1),
                       ),
-                      child: Icon(Icons.add, size: 18, color: t.primary),
+                      child: Center(
+                        child: Text(
+                          '+',
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: t.primary,
+                            height: 1,
+                            fontWeight: FontWeight.w300,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -492,10 +500,9 @@ class _AreaCardState extends State<_AreaCard> {
                         AnimatedRotation(
                           turns: _expanded ? 0.5 : 0.0,
                           duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            Icons.expand_more,
-                            size: 20,
-                            color: t.txtTertiary,
+                          child: Text(
+                            '▾',
+                            style: TextStyle(fontSize: 20, color: t.txtTertiary, height: 1),
                           ),
                         ),
                       ],
@@ -583,7 +590,9 @@ class _CategorySectionState extends State<_CategorySection> {
                     color: cat.color.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(cat.icon, color: cat.color, size: 18),
+                  child: Center(
+                    child: Text(cat.emoji, style: const TextStyle(fontSize: 18)),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -632,8 +641,10 @@ class _CategorySectionState extends State<_CategorySection> {
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0.0,
                   duration: const Duration(milliseconds: 200),
-                  child:
-                      Icon(Icons.expand_more, size: 16, color: t.txtDisabled),
+                  child: Text(
+                    '▾',
+                    style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1),
+                  ),
                 ),
               ],
             ),
