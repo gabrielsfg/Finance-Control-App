@@ -53,6 +53,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (_, _) => const RegisterPage(),
       ),
+      GoRoute(
+        path: '/transactions/add',
+        builder: (_, _) => const AddTransactionPage(),
+      ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),
         routes: [
@@ -64,10 +68,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/transactions',
             builder: (_, _) => const TransactionsPage(),
             routes: [
-              GoRoute(
-                path: 'add',
-                builder: (_, _) => const AddTransactionPage(),
-              ),
               GoRoute(
                 path: 'detail',
                 builder: (context, state) {
