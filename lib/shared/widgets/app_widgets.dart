@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
@@ -215,6 +216,7 @@ class AppInputField extends StatefulWidget {
   final TextCapitalization textCapitalization;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onSubmitted;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppInputField({
     super.key,
@@ -230,6 +232,7 @@ class AppInputField extends StatefulWidget {
     this.textCapitalization = TextCapitalization.none,
     this.onChanged,
     this.onSubmitted,
+    this.inputFormatters,
   });
 
   @override
@@ -297,6 +300,7 @@ class _AppInputFieldState extends State<AppInputField> {
                     keyboardType: widget.keyboardType,
                     textInputAction: widget.textInputAction,
                     textCapitalization: widget.textCapitalization,
+                    inputFormatters: widget.inputFormatters,
                     onChanged: widget.onChanged,
                     onSubmitted:
                         widget.onSubmitted != null ? (_) => widget.onSubmitted!() : null,

@@ -4,6 +4,86 @@
 /// here. Never define formatting functions inside a page or widget file.
 library;
 
+import 'package:flutter/services.dart';
+
+/// A [TextInputFormatter] that formats monetary input as cents-based currency.
+///
+/// The user types only digits (and optionally a leading `-` when [allowNegative]
+/// is true). The formatter automatically inserts the decimal separator so that
+/// the last two digits are always the cent portion.
+///
+/// Examples (allowNegative: false):
+///   typing "4"    → "0,04"
+///   typing "43"   → "0,43"
+///   typing "432"  → "4,32"
+///   typing "43254"→ "432,54"
+///
+/// To read the value back as cents, call [CentsInputFormatter.parseCents].
+class CentsInputFormatter extends TextInputFormatter {
+  const CentsInputFormatter({this.allowNegative = false});
+
+  final bool allowNegative;
+
+  /// Parses a formatted string (e.g. "-1.234,56") back to cents.
+  static int parseCents(String formatted) {
+    final isNegative = formatted.startsWith('-');
+    final digits = formatted.replaceAll(RegExp(r'[^\d]'), '');
+    final value = int.tryParse(digits) ?? 0;
+    return isNegative ? -value : value;
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text;
+    final isNegative = allowNegative && raw.startsWith('-');
+    final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+
+    // If the user just typed '-' and no digits yet, keep the '-' as-is so
+    // they can continue typing digits.
+    if (isNegative && digits.isEmpty) {
+      return const TextEditingValue(
+        text: '-',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+    }
+
+    final formatted = _format(digits, isNegative);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  static String _format(String digits, bool isNegative) {
+    if (digits.isEmpty) return '';
+
+    // Pad to at least 3 digits so we always have a cent portion.
+    final padded = digits.padLeft(3, '0');
+
+    final rawInt = padded.substring(0, padded.length - 2);
+    final centPart = padded.substring(padded.length - 2);
+
+    // Strip leading zeros from the integer part (keep at least one digit).
+    final intPart = rawInt.replaceFirst(RegExp(r'^0+'), '').isEmpty
+        ? '0'
+        : rawInt.replaceFirst(RegExp(r'^0+'), '');
+
+    // Insert thousand separators in the integer part.
+    final buf = StringBuffer();
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buf.write('.');
+      buf.write(intPart[i]);
+    }
+
+    final result = '$buf,$centPart';
+    return isNegative ? '-$result' : result;
+  }
+}
+
 /// Formats an integer amount in cents to the Brazilian Real format.
 ///
 /// Examples:

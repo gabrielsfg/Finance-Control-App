@@ -1,13 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../accounts/data/account_repository.dart';
-import '../../accounts/data/dtos/account_response_dto.dart';
+import '../../accounts/data/models/account.dart';
+import '../../accounts/providers/accounts_provider.dart';
 import '../data/categories_repository.dart';
 import '../data/dtos/category_response_dto.dart';
 
-final accountsProvider =
-    FutureProvider<List<AccountResponseDto>>((ref) async {
-  return ref.read(accountRepositoryProvider).getAccounts();
+final accountsProvider = FutureProvider<List<Account>>((ref) async {
+  return ref.watch(accountsNotifierProvider.future);
 });
 
 final categoriesProvider =

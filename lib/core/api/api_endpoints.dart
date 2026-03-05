@@ -11,7 +11,8 @@ abstract class ApiEndpoints {
   static const String mainPageSummary = '/api/mainpage/summary';
 
   // Accounts
-  static const String accounts = '/api/accounts';
+  static const String accounts = '/api/Account';
+  static String accountById(int id) => '/api/Account/$id';
 
   // Transactions
   static const String transactions = '/api/transactions';
