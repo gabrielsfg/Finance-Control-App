@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../features/accounts/presentation/accounts_page.dart';
 import '../../features/accounts/presentation/create_account_page.dart';
 import '../../features/accounts/presentation/edit_account_page.dart';
+import '../../features/categories/presentation/categories_page.dart';
+import '../../features/categories/presentation/create_category_page.dart';
+import '../../features/categories/presentation/edit_categories_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/auth/presentation/register_page.dart';
@@ -62,6 +65,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/accounts/create',
         builder: (_, _) => const CreateAccountPage(),
+      ),
+      GoRoute(
+        path: '/categories',
+        builder: (_, _) => const CategoriesPage(),
+        routes: [
+          GoRoute(
+            path: 'create',
+            builder: (_, _) => const CreateCategoryPage(),
+          ),
+          GoRoute(
+            path: 'edit',
+            builder: (_, _) => const EditCategoriesPage(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/accounts/:id/edit',
