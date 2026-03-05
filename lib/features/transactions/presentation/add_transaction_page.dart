@@ -9,8 +9,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
-import '../../accounts/data/dtos/account_response_dto.dart';
+import '../../accounts/data/models/account.dart';
 import '../data/dtos/category_response_dto.dart';
 import '../data/dtos/create_transaction_request_dto.dart';
 import '../providers/picker_providers.dart';
@@ -81,9 +82,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     String? installmentsError;
     String? recurrenceError;
 
-    final rawAmount = _amountController.text.replaceAll(',', '.').trim();
-    final amount = double.tryParse(rawAmount) ?? 0;
-    if (amount <= 0) valueError = 'Enter a valid amount';
+    final valueInCents = CentsInputFormatter.parseCents(_amountController.text);
+    if (valueInCents <= 0) valueError = 'Enter a valid amount';
 
     if (_accountId == null) accountError = 'Select an account';
 
@@ -116,9 +116,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
   Future<void> _submit() async {
     if (!_validate()) return;
 
-    final rawAmount = _amountController.text.replaceAll(',', '.').trim();
-    final amount = double.parse(rawAmount);
-    final valueInCents = (amount * 100).round();
+    final valueInCents = CentsInputFormatter.parseCents(_amountController.text);
 
     final dto = CreateTransactionRequestDto(
       subCategoryId: _subcategoryId!,
@@ -211,7 +209,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     );
   }
 
-  void _openAccountPicker(List<AccountResponseDto> accounts) {
+  void _openAccountPicker(List<Account> accounts) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -702,11 +700,10 @@ class _AmountDisplay extends StatelessWidget {
               IntrinsicWidth(
                 child: TextField(
                   controller: controller,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d{0,9}([,\.]\d{0,2})?')),
+                    FilteringTextInputFormatter.digitsOnly,
+                    const CentsInputFormatter(),
                   ],
                   style: AppTextStyles.moneyLg(accentColor).copyWith(
                     fontSize: 36,
@@ -1485,7 +1482,7 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
 // ── Account Picker Bottom Sheet ─────────────────────────────────────────────
 
 class _AccountPickerSheet extends StatefulWidget {
-  final List<AccountResponseDto> accounts;
+  final List<Account> accounts;
   final int? selectedId;
   final void Function(int id, String name) onSelected;
 

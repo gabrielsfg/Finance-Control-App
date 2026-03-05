@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/accounts/presentation/accounts_page.dart';
+import '../../features/accounts/presentation/create_account_page.dart';
+import '../../features/accounts/presentation/edit_account_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/auth/presentation/register_page.dart';
@@ -56,6 +58,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/transactions/add',
         builder: (_, _) => const AddTransactionPage(),
+      ),
+      GoRoute(
+        path: '/accounts/create',
+        builder: (_, _) => const CreateAccountPage(),
+      ),
+      GoRoute(
+        path: '/accounts/:id/edit',
+        builder: (_, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          return EditAccountPage(accountId: id);
+        },
       ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),
