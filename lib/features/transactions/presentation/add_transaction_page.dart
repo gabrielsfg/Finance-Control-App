@@ -12,6 +12,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../accounts/data/models/account.dart';
+import '../../categories/providers/subcategories_provider.dart';
 import '../data/dtos/category_response_dto.dart';
 import '../data/dtos/create_transaction_request_dto.dart';
 import '../providers/picker_providers.dart';
@@ -1270,7 +1271,7 @@ class _BudgetToggle extends StatelessWidget {
 
 // ── Subcategory Picker Page ─────────────────────────────────────────────────
 
-class _SubcategoryPickerPage extends StatefulWidget {
+class _SubcategoryPickerPage extends ConsumerStatefulWidget {
   final List<CategoryResponseDto> categories;
   final int? selectedId;
   final void Function(int id, String name) onSelected;
@@ -1282,15 +1283,66 @@ class _SubcategoryPickerPage extends StatefulWidget {
   });
 
   @override
-  State<_SubcategoryPickerPage> createState() => _SubcategoryPickerPageState();
+  ConsumerState<_SubcategoryPickerPage> createState() =>
+      _SubcategoryPickerPageState();
 }
 
-class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
-  bool _editMode = false;
+class _SubcategoryPickerPageState
+    extends ConsumerState<_SubcategoryPickerPage> {
+  final _searchController = TextEditingController();
+  String _filter = '';
+  late List<CategoryResponseDto> _categories;
+
+  @override
+  void initState() {
+    super.initState();
+    _categories = List.from(widget.categories);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _openCreateSubcategorySheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _PickerCreateSubcategorySheet(
+        categories: _categories,
+        onCreated: () async {
+          final updated = await ref.read(categoriesProvider.future);
+          if (mounted) setState(() => _categories = updated);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final q = _filter.trim().toLowerCase();
+
+    final filtered = _categories
+        .map((cat) {
+          if (q.isEmpty) return cat;
+          final catMatches = cat.name.toLowerCase().contains(q);
+          final matchingSubs = cat.subCategories
+              .where((s) => s.name.toLowerCase().contains(q))
+              .toList();
+          if (!catMatches && matchingSubs.isEmpty) return null;
+          return CategoryResponseDto(
+            id: cat.id,
+            name: cat.name,
+            subCategories: catMatches ? cat.subCategories : matchingSubs,
+          );
+        })
+        .whereType<CategoryResponseDto>()
+        .where((c) => c.subCategories.isNotEmpty)
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1300,6 +1352,7 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
           bottom: false,
           child: Column(
             children: [
+              // App bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
@@ -1310,7 +1363,7 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                     ),
                     Expanded(
                       child: Text(
-                        _editMode ? 'Edit Subcategories' : 'Subcategories',
+                        'Subcategoria',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.body(t.txtPrimary).copyWith(
                           fontWeight: FontWeight.w700,
@@ -1318,74 +1371,136 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                         ),
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Edit toggle button
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _editMode = !_editMode),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _editMode
-                                  ? t.primary.withValues(alpha: 0.15)
-                                  : t.isDark
-                                      ? Colors.white.withValues(alpha: 0.08)
-                                      : t.primary.withValues(alpha: 0.08),
-                            ),
-                            child: Icon(
-                              LucideIcons.pencil,
-                              size: 16,
-                              color: _editMode ? t.primary : t.txtSecondary,
-                            ),
-                          ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/categories/edit');
+                      },
+                      child: Text(
+                        'Editar',
+                        style: AppTextStyles.body(t.primary).copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
                         ),
-                        const SizedBox(width: 8),
-                        // Add button
-                        GestureDetector(
-                          onTap: () {
-                            // TODO: navigate to add subcategory page
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: t.isDark
-                                  ? Colors.white.withValues(alpha: 0.08)
-                                  : t.primary.withValues(alpha: 0.08),
-                            ),
-                            child: Icon(LucideIcons.plus,
-                                size: 18, color: t.primary),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
+              // Search field
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: t.isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : t.primary.withValues(alpha: 0.05),
+                    borderRadius: AppRadius.baseAll,
+                    border: Border.all(
+                      color: t.primary.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _filter = v),
+                    style: AppTextStyles.body(t.txtPrimary)
+                        .copyWith(fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 11),
+                      hintText: 'Buscar subcategoria...',
+                      hintStyle: AppTextStyles.body(t.txtDisabled)
+                          .copyWith(fontSize: 14),
+                      prefixIcon: Icon(LucideIcons.search,
+                          size: 16, color: t.txtDisabled),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Action buttons
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _openCreateSubcategorySheet,
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: AppRadius.baseAll,
+                            boxShadow: AppShadows.primaryBtnShadow,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '+ Nova Sub',
+                              style: AppTextStyles.body(Colors.white).copyWith(
+                                  fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          context.push('/categories/create');
+                        },
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: t.isDark
+                                ? const Color(0xFF1C1830)
+                                    .withValues(alpha: 0.72)
+                                : Colors.white.withValues(alpha: 0.9),
+                            borderRadius: AppRadius.baseAll,
+                            border: Border.all(
+                                color: t.primary.withValues(alpha: 0.4),
+                                width: 1.5),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '+ Categoria',
+                              style: AppTextStyles.body(t.primary).copyWith(
+                                  fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Subcategory list
               Expanded(
-                child: widget.categories.isEmpty
+                child: filtered.isEmpty
                     ? Center(
                         child: Text(
-                          'No subcategories found.',
+                          'Nenhuma subcategoria encontrada.',
                           style: AppTextStyles.body(t.txtTertiary),
                         ),
                       )
                     : ListView(
                         padding:
-                            AppSpacing.screenPadding.copyWith(bottom: 32),
-                        children: widget.categories.map((cat) {
-                          if (cat.subCategories.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-
+                            EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 32),
+                        children: filtered.map((cat) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1402,69 +1517,88 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                                   ),
                                 ),
                               ),
-                              _FormCard(
-                                children: cat.subCategories
-                                    .asMap()
-                                    .entries
-                                    .map((e) {
-                                  final sub = e.value;
-                                  final isLast =
-                                      e.key == cat.subCategories.length - 1;
-                                  final isSelected =
-                                      sub.id == widget.selectedId;
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: t.isDark
+                                      ? const Color(0xFF1C1830)
+                                          .withValues(alpha: 0.72)
+                                      : Colors.white.withValues(alpha: 0.9),
+                                  borderRadius: AppRadius.xlAll,
+                                  border: Border.all(
+                                    color: t.isDark
+                                        ? Colors.white.withValues(alpha: 0.07)
+                                        : const Color(0xFF7C3AED)
+                                            .withValues(alpha: 0.12),
+                                  ),
+                                  boxShadow:
+                                      t.isDark ? [] : AppShadows.cardLight,
+                                ),
+                                child: Column(
+                                  children: cat.subCategories
+                                      .asMap()
+                                      .entries
+                                      .map((e) {
+                                    final sub = e.value;
+                                    final isLast = e.key ==
+                                        cat.subCategories.length - 1;
+                                    final isSelected =
+                                        sub.id == widget.selectedId;
 
-                                  return Column(
-                                    children: [
-                                      GestureDetector(
-                                        onTap: _editMode
-                                            ? () {
-                                                // TODO: navigate to edit subcategory page
-                                              }
-                                            : () {
-                                                widget.onSelected(
-                                                    sub.id, sub.name);
-                                                Navigator.of(context).pop();
-                                              },
-                                        behavior: HitTestBehavior.opaque,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 14),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                sub.name,
-                                                style: AppTextStyles.body(
-                                                  _editMode
-                                                      ? t.txtPrimary
-                                                      : isSelected
+                                    return Column(
+                                      children: [
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () {
+                                            widget.onSelected(
+                                                sub.id, sub.name);
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 14),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    sub.name,
+                                                    style: AppTextStyles.body(
+                                                      isSelected
                                                           ? t.primary
                                                           : t.txtPrimary,
-                                                ).copyWith(
-                                                  fontSize: 14,
-                                                  fontWeight:
-                                                      !_editMode && isSelected
+                                                    ).copyWith(
+                                                      fontSize: 14,
+                                                      fontWeight: isSelected
                                                           ? FontWeight.w600
                                                           : FontWeight.w400,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
-                                              if (_editMode)
-                                                Icon(LucideIcons.pencil,
-                                                    size: 14,
-                                                    color: t.txtDisabled)
-                                              else if (isSelected)
-                                                Icon(LucideIcons.check,
+                                                if (isSelected)
+                                                  Icon(LucideIcons.check,
+                                                      size: 16,
+                                                      color: t.primary)
+                                                else
+                                                  Icon(
+                                                    LucideIcons.chevronRight,
                                                     size: 16,
-                                                    color: t.primary),
-                                            ],
+                                                    color: t.txtDisabled,
+                                                  ),
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      if (!isLast) _InternalDivider(),
-                                    ],
-                                  );
-                                }).toList(),
+                                        if (!isLast)
+                                          Divider(
+                                            height: 1,
+                                            thickness: 1,
+                                            indent: 16,
+                                            color: t.divider.withValues(
+                                                alpha: t.isDark ? 0.2 : 0.4),
+                                          ),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                             ],
                           );
@@ -1473,6 +1607,219 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Picker: Create Subcategory Sheet ─────────────────────────────────────────
+
+class _PickerCreateSubcategorySheet extends ConsumerStatefulWidget {
+  final List<CategoryResponseDto> categories;
+  final VoidCallback onCreated;
+
+  const _PickerCreateSubcategorySheet({
+    required this.categories,
+    required this.onCreated,
+  });
+
+  @override
+  ConsumerState<_PickerCreateSubcategorySheet> createState() =>
+      _PickerCreateSubcategorySheetState();
+}
+
+class _PickerCreateSubcategorySheetState
+    extends ConsumerState<_PickerCreateSubcategorySheet> {
+  final _nameController = TextEditingController();
+  int? _selectedCategoryId;
+  bool _loading = false;
+  String? _nameError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.categories.isNotEmpty) {
+      _selectedCategoryId = widget.categories.first.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Digite um nome');
+      return;
+    }
+    if (_selectedCategoryId == null) return;
+
+    setState(() {
+      _loading = true;
+      _nameError = null;
+    });
+    try {
+      await ref
+          .read(subcategoriesNotifierProvider.notifier)
+          .create(name, _selectedCategoryId!);
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onCreated();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao criar subcategoria.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl3)),
+          boxShadow: AppShadows.bottomSheet,
+        ),
+        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPad + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: t.isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.pillAll,
+                ),
+              ),
+            ),
+            Text('Nova Subcategoria',
+                style: AppTextStyles.h3(t.txtPrimary)),
+            const SizedBox(height: 20),
+            Text(
+              'Nome',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              style:
+                  AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Ex: Aluguel',
+                hintStyle: AppTextStyles.body(t.txtDisabled)
+                    .copyWith(fontSize: 15),
+                errorText: _nameError,
+                filled: true,
+                fillColor: t.isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : t.primary.withValues(alpha: 0.04),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(
+                      color: t.primary.withValues(alpha: 0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(
+                      color: t.primary.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(color: t.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Categoria',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: t.isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : t.primary.withValues(alpha: 0.04),
+                borderRadius: AppRadius.baseAll,
+                border: Border.all(
+                    color: t.primary.withValues(alpha: 0.2), width: 1),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _selectedCategoryId,
+                  isExpanded: true,
+                  dropdownColor:
+                      t.isDark ? const Color(0xFF1C1830) : Colors.white,
+                  style: AppTextStyles.body(t.txtPrimary)
+                      .copyWith(fontSize: 15),
+                  items: widget.categories
+                      .map((c) => DropdownMenuItem(
+                          value: c.id, child: Text(c.name)))
+                      .toList(),
+                  onChanged: (v) =>
+                      setState(() => _selectedCategoryId = v),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: _loading ? null : _submit,
+              child: Container(
+                height: 50,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: _loading ? null : AppColors.primaryGradient,
+                  color: _loading
+                      ? t.primary.withValues(alpha: 0.4)
+                      : null,
+                  borderRadius: AppRadius.baseAll,
+                  boxShadow: _loading ? [] : AppShadows.primaryBtnShadow,
+                ),
+                child: Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          'Criar',
+                          style: AppTextStyles.body(Colors.white).copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
