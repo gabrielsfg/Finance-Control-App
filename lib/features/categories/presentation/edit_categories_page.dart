@@ -10,14 +10,15 @@ import '../../../shared/widgets/app_widgets.dart';
 import '../data/category_repository.dart';
 import '../data/dtos/category_response_dto.dart';
 import '../providers/categories_provider.dart';
+import '../providers/subcategories_provider.dart';
 
 // ── Provider ───────────────────────────────────────────────────────────────
 
 final _editCategoriesProvider =
     FutureProvider<List<CategoryItemResponseDto>>((ref) async {
-  // Re-fetches whenever categoriesNotifierProvider changes so that
-  // create/delete actions are reflected here without a manual refresh.
+  // Re-fetches whenever either notifier changes so create/delete are reflected.
   ref.watch(categoriesNotifierProvider);
+  ref.watch(subcategoriesNotifierProvider);
   return ref.read(categoryRepositoryProvider).getCategories();
 });
 
@@ -34,7 +35,6 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
   final _searchController = TextEditingController();
   String _filter = '';
 
-  // id → new name for every locally-modified category
   final Map<int, String> _pendingChanges = {};
   bool _saving = false;
 
@@ -79,6 +79,18 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
     }
   }
 
+  void _openCreateSubcategorySheet(List<CategoryItemResponseDto> categories) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _CreateSubcategorySheet(
+        categories: categories,
+        onCreated: () => ref.invalidate(_editCategoriesProvider),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(_editCategoriesProvider);
@@ -106,7 +118,16 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
                           setState(() => _filter = v.toLowerCase()),
                     ),
                     const SizedBox(height: 14),
-                    const _ActionButtons(),
+                    categoriesAsync.when(
+                      data: (cats) => _ActionButtons(
+                        onCreateSubcategory: () =>
+                            _openCreateSubcategorySheet(cats),
+                      ),
+                      loading: () =>
+                          const _ActionButtons(onCreateSubcategory: null),
+                      error: (_, _) =>
+                          const _ActionButtons(onCreateSubcategory: null),
+                    ),
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -136,12 +157,15 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
                       itemCount: filtered.length,
                       itemBuilder: (_, i) => _CategoryGroup(
                         category: filtered[i],
+                        allCategories: categories,
                         pendingName: _pendingChanges[filtered[i].id],
                         onNameChanged: (newName) => _onNameChanged(
                           filtered[i].id,
                           filtered[i].name,
                           newName,
                         ),
+                        onSubcategoryChanged: () =>
+                            ref.invalidate(_editCategoriesProvider),
                       ),
                     );
                   },
@@ -156,14 +180,12 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
                       height: 52,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        gradient:
-                            _saving ? null : AppColors.primaryGradient,
+                        gradient: _saving ? null : AppColors.primaryGradient,
                         color: _saving
                             ? t.primary.withValues(alpha: 0.4)
                             : null,
                         borderRadius: AppRadius.baseAll,
-                        boxShadow:
-                            _saving ? [] : AppShadows.primaryBtnShadow,
+                        boxShadow: _saving ? [] : AppShadows.primaryBtnShadow,
                       ),
                       child: Center(
                         child: _saving
@@ -175,8 +197,8 @@ class _EditCategoriesPageState extends ConsumerState<EditCategoriesPage> {
                               )
                             : Text(
                                 'Salvar alterações',
-                                style:
-                                    AppTextStyles.body(Colors.white).copyWith(
+                                style: AppTextStyles.body(Colors.white)
+                                    .copyWith(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
                                 ),
@@ -283,7 +305,9 @@ class _SearchBar extends StatelessWidget {
 // ── Action Buttons ─────────────────────────────────────────────────────────
 
 class _ActionButtons extends StatelessWidget {
-  const _ActionButtons();
+  final VoidCallback? onCreateSubcategory;
+
+  const _ActionButtons({required this.onCreateSubcategory});
 
   @override
   Widget build(BuildContext context) {
@@ -293,9 +317,7 @@ class _ActionButtons extends StatelessWidget {
           child: _PrimaryActionButton(
             label: '+ Nova Sub',
             filled: true,
-            onTap: () {
-              // TODO: open create subcategory sheet
-            },
+            onTap: onCreateSubcategory,
           ),
         ),
         const SizedBox(width: 12),
@@ -314,7 +336,7 @@ class _ActionButtons extends StatelessWidget {
 class _PrimaryActionButton extends StatelessWidget {
   final String label;
   final bool filled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _PrimaryActionButton({
     required this.label,
@@ -328,30 +350,33 @@ class _PrimaryActionButton extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 42,
-        decoration: BoxDecoration(
-          gradient: filled ? AppColors.primaryGradient : null,
-          color: filled
-              ? null
-              : (t.isDark
-                  ? const Color(0xFF1C1830).withValues(alpha: 0.72)
-                  : Colors.white.withValues(alpha: 0.9)),
-          borderRadius: AppRadius.baseAll,
-          border: filled
-              ? null
-              : Border.all(
-                  color: t.primary.withValues(alpha: 0.4),
-                  width: 1.5,
-                ),
-          boxShadow: filled ? AppShadows.primaryBtnShadow : [],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTextStyles.body(
-              filled ? Colors.white : t.primary,
-            ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+      child: Opacity(
+        opacity: onTap == null ? 0.5 : 1.0,
+        child: Container(
+          height: 42,
+          decoration: BoxDecoration(
+            gradient: filled ? AppColors.primaryGradient : null,
+            color: filled
+                ? null
+                : (t.isDark
+                    ? const Color(0xFF1C1830).withValues(alpha: 0.72)
+                    : Colors.white.withValues(alpha: 0.9)),
+            borderRadius: AppRadius.baseAll,
+            border: filled
+                ? null
+                : Border.all(
+                    color: t.primary.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+            boxShadow: filled ? AppShadows.primaryBtnShadow : [],
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: AppTextStyles.body(
+                filled ? Colors.white : t.primary,
+              ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
           ),
         ),
       ),
@@ -363,13 +388,17 @@ class _PrimaryActionButton extends StatelessWidget {
 
 class _CategoryGroup extends ConsumerStatefulWidget {
   final CategoryItemResponseDto category;
+  final List<CategoryItemResponseDto> allCategories;
   final String? pendingName;
   final ValueChanged<String> onNameChanged;
+  final VoidCallback onSubcategoryChanged;
 
   const _CategoryGroup({
     required this.category,
+    required this.allCategories,
     required this.pendingName,
     required this.onNameChanged,
+    required this.onSubcategoryChanged,
   });
 
   @override
@@ -556,7 +585,11 @@ class _CategoryGroupState extends ConsumerState<_CategoryGroup> {
           ),
           // ── Subcategory rows ─────────────────────────────────────────
           ...widget.category.subCategories.map(
-            (sub) => _SubcategoryRow(subcategoryName: sub.name),
+            (sub) => _SubcategoryRow(
+              subcategory: sub,
+              allCategories: widget.allCategories,
+              onChanged: widget.onSubcategoryChanged,
+            ),
           ),
           if (widget.category.subCategories.isEmpty)
             Padding(
@@ -575,10 +608,83 @@ class _CategoryGroupState extends ConsumerState<_CategoryGroup> {
 
 // ── Subcategory Row ────────────────────────────────────────────────────────
 
-class _SubcategoryRow extends StatelessWidget {
-  final String subcategoryName;
+class _SubcategoryRow extends ConsumerStatefulWidget {
+  final SubcategoryItemResponseDto subcategory;
+  final List<CategoryItemResponseDto> allCategories;
+  final VoidCallback onChanged;
 
-  const _SubcategoryRow({required this.subcategoryName});
+  const _SubcategoryRow({
+    required this.subcategory,
+    required this.allCategories,
+    required this.onChanged,
+  });
+
+  @override
+  ConsumerState<_SubcategoryRow> createState() => _SubcategoryRowState();
+}
+
+class _SubcategoryRowState extends ConsumerState<_SubcategoryRow> {
+  bool _deleting = false;
+
+  Future<void> _delete() async {
+    final t = AppThemeTokens.of(context);
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor:
+                t.isDark ? const Color(0xFF1C1830) : Colors.white,
+            title: Text('Deletar subcategoria',
+                style: AppTextStyles.h3(t.txtPrimary)),
+            content: Text(
+              'Deseja deletar "${widget.subcategory.name}"? Esta ação não pode ser desfeita.',
+              style: AppTextStyles.body(t.txtSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('Cancelar',
+                    style: AppTextStyles.body(t.txtTertiary)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text('Deletar',
+                    style: AppTextStyles.body(t.error)
+                        .copyWith(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+    setState(() => _deleting = true);
+    try {
+      await ref
+          .read(subcategoriesNotifierProvider.notifier)
+          .delete(widget.subcategory.id);
+      widget.onChanged();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao deletar subcategoria.')),
+        );
+      }
+    }
+  }
+
+  void _openEditSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _EditSubcategorySheet(
+        subcategory: widget.subcategory,
+        allCategories: widget.allCategories,
+        onUpdated: widget.onChanged,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -592,7 +698,7 @@ class _SubcategoryRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  subcategoryName,
+                  widget.subcategory.name,
                   style: AppTextStyles.body(t.txtPrimary).copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -600,9 +706,7 @@ class _SubcategoryRow extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () {
-                  // TODO: edit subcategory
-                },
+                onTap: _openEditSheet,
                 child: Text(
                   'Editar',
                   style: AppTextStyles.bodySm(t.primary)
@@ -610,22 +714,28 @@ class _SubcategoryRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              GestureDetector(
-                onTap: () {
-                  // TODO: delete subcategory
-                },
-                child: Container(
+              if (_deleting)
+                SizedBox(
                   width: 22,
                   height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.error.withValues(alpha: 0.1),
-                    border: Border.all(
-                        color: t.error.withValues(alpha: 0.3), width: 1),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: t.error),
+                )
+              else
+                GestureDetector(
+                  onTap: _delete,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.error.withValues(alpha: 0.1),
+                      border: Border.all(
+                          color: t.error.withValues(alpha: 0.3), width: 1),
+                    ),
+                    child: Icon(LucideIcons.x, size: 12, color: t.error),
                   ),
-                  child: Icon(LucideIcons.x, size: 12, color: t.error),
                 ),
-              ),
             ],
           ),
         ),
@@ -636,6 +746,426 @@ class _SubcategoryRow extends StatelessWidget {
           color: t.divider.withValues(alpha: t.isDark ? 0.2 : 0.4),
         ),
       ],
+    );
+  }
+}
+
+// ── Create Subcategory Sheet ────────────────────────────────────────────────
+
+class _CreateSubcategorySheet extends ConsumerStatefulWidget {
+  final List<CategoryItemResponseDto> categories;
+  final VoidCallback onCreated;
+
+  const _CreateSubcategorySheet({
+    required this.categories,
+    required this.onCreated,
+  });
+
+  @override
+  ConsumerState<_CreateSubcategorySheet> createState() =>
+      _CreateSubcategorySheetState();
+}
+
+class _CreateSubcategorySheetState
+    extends ConsumerState<_CreateSubcategorySheet> {
+  final _nameController = TextEditingController();
+  int? _selectedCategoryId;
+  bool _loading = false;
+  String? _nameError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.categories.isNotEmpty) {
+      _selectedCategoryId = widget.categories.first.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Digite um nome');
+      return;
+    }
+    if (_selectedCategoryId == null) return;
+
+    setState(() {
+      _loading = true;
+      _nameError = null;
+    });
+    try {
+      await ref
+          .read(subcategoriesNotifierProvider.notifier)
+          .create(name, _selectedCategoryId!);
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onCreated();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao criar subcategoria.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl3)),
+          boxShadow: AppShadows.bottomSheet,
+        ),
+        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPad + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: t.isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.pillAll,
+                ),
+              ),
+            ),
+            Text('Nova Subcategoria', style: AppTextStyles.h3(t.txtPrimary)),
+            const SizedBox(height: 20),
+            Text(
+              'Nome',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Ex: Aluguel',
+                hintStyle:
+                    AppTextStyles.body(t.txtDisabled).copyWith(fontSize: 15),
+                errorText: _nameError,
+                filled: true,
+                fillColor: t.isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : t.primary.withValues(alpha: 0.04),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(color: t.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Categoria',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            _CategoryDropdown(
+              categories: widget.categories,
+              selectedId: _selectedCategoryId,
+              onChanged: (v) => setState(() => _selectedCategoryId = v),
+            ),
+            const SizedBox(height: 24),
+            _SheetSubmitButton(
+              label: 'Criar',
+              loading: _loading,
+              onTap: _loading ? null : _submit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Edit Subcategory Sheet ──────────────────────────────────────────────────
+
+class _EditSubcategorySheet extends ConsumerStatefulWidget {
+  final SubcategoryItemResponseDto subcategory;
+  final List<CategoryItemResponseDto> allCategories;
+  final VoidCallback onUpdated;
+
+  const _EditSubcategorySheet({
+    required this.subcategory,
+    required this.allCategories,
+    required this.onUpdated,
+  });
+
+  @override
+  ConsumerState<_EditSubcategorySheet> createState() =>
+      _EditSubcategorySheetState();
+}
+
+class _EditSubcategorySheetState
+    extends ConsumerState<_EditSubcategorySheet> {
+  late final TextEditingController _nameController;
+  late int _selectedCategoryId;
+  bool _loading = false;
+  String? _nameError;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController =
+        TextEditingController(text: widget.subcategory.name);
+    _selectedCategoryId = widget.subcategory.categoryId;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Digite um nome');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _nameError = null;
+    });
+    try {
+      await ref
+          .read(subcategoriesNotifierProvider.notifier)
+          .updateSubcategory(
+              widget.subcategory.id, name, _selectedCategoryId);
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onUpdated();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao atualizar subcategoria.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl3)),
+          boxShadow: AppShadows.bottomSheet,
+        ),
+        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPad + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: t.isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.pillAll,
+                ),
+              ),
+            ),
+            Text('Editar Subcategoria',
+                style: AppTextStyles.h3(t.txtPrimary)),
+            const SizedBox(height: 20),
+            Text(
+              'Nome',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Nome da subcategoria',
+                hintStyle:
+                    AppTextStyles.body(t.txtDisabled).copyWith(fontSize: 15),
+                errorText: _nameError,
+                filled: true,
+                fillColor: t.isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : t.primary.withValues(alpha: 0.04),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(color: t.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Categoria',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            _CategoryDropdown(
+              categories: widget.allCategories,
+              selectedId: _selectedCategoryId,
+              onChanged: (v) => setState(() => _selectedCategoryId = v!),
+            ),
+            const SizedBox(height: 24),
+            _SheetSubmitButton(
+              label: 'Salvar',
+              loading: _loading,
+              onTap: _loading ? null : _submit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared sheet widgets ────────────────────────────────────────────────────
+
+class _CategoryDropdown extends StatelessWidget {
+  final List<CategoryItemResponseDto> categories;
+  final int? selectedId;
+  final ValueChanged<int?> onChanged;
+
+  const _CategoryDropdown({
+    required this.categories,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: t.isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : t.primary.withValues(alpha: 0.04),
+        borderRadius: AppRadius.baseAll,
+        border:
+            Border.all(color: t.primary.withValues(alpha: 0.2), width: 1),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: selectedId,
+          isExpanded: true,
+          dropdownColor:
+              t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 15),
+          items: categories
+              .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetSubmitButton extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _SheetSubmitButton({
+    required this.label,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 50,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: loading ? null : AppColors.primaryGradient,
+          color: loading ? t.primary.withValues(alpha: 0.4) : null,
+          borderRadius: AppRadius.baseAll,
+          boxShadow: loading ? [] : AppShadows.primaryBtnShadow,
+        ),
+        child: Center(
+          child: loading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2),
+                )
+              : Text(
+                  label,
+                  style: AppTextStyles.body(Colors.white).copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+        ),
+      ),
     );
   }
 }

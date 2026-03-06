@@ -15,7 +15,7 @@ class CategoriesRepository {
   final Dio _dio;
 
   Future<List<CategoryResponseDto>> getCategories() async {
-    final response = await _dio.get(ApiEndpoints.categories);
+    final response = await _dio.get(ApiEndpoints.userCategories);
     return (response.data as List)
         .map((e) => CategoryResponseDto.fromJson(e as Map<String, dynamic>))
         .toList();

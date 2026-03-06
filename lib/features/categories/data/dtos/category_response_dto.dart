@@ -24,11 +24,16 @@ class SubcategoryItemResponseDto {
     required this.id,
     required this.name,
     required this.categoryId,
+    this.categoryName,
   });
 
   final int id;
   final String name;
   final int categoryId;
+
+  /// Only present when fetched via GET /api/SubCategory/all.
+  /// Not included when subcategories are nested inside a category response.
+  final String? categoryName;
 
   factory SubcategoryItemResponseDto.fromJson(Map<String, dynamic> json) =>
       _$SubcategoryItemResponseDtoFromJson(json);

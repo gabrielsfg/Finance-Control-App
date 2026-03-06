@@ -15,7 +15,7 @@ abstract class ApiEndpoints {
   static String accountById(int id) => '/api/Account/$id';
 
   // Transactions
-  static const String transactions = '/api/transactions';
+  static const String transactions = '/api/Transaction';
 
   // Categories (transaction picker — includes system categories)
   static const String categories = '/api/categories';
@@ -26,9 +26,10 @@ abstract class ApiEndpoints {
   static const String userCategoryUpdate = '/api/category';
 
   // Subcategories
-  static const String subcategories = '/api/subcategory';
-  static const String allSubcategories = '/api/subcategory/all';
-  static String subcategoryById(int id) => '/api/subcategory/by-id/$id';
+  static const String subcategories = '/api/SubCategory';
+  static const String allSubcategories = '/api/SubCategory/all';
+  static String subcategoryById(int id) => '/api/SubCategory/by-id/$id';
+  static String deleteSubcategory(int id) => '/api/SubCategory/$id';
 
   // Budgets
   static const String budgets = '/api/budgets';
