@@ -87,6 +87,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           return EditAccountPage(accountId: id);
         },
       ),
+      GoRoute(
+        path: '/budgets/create/step1',
+        builder: (_, _) => const CreateBudgetStep1Page(),
+      ),
+      GoRoute(
+        path: '/budgets/create/step2',
+        builder: (_, _) => const CreateBudgetStep2Page(),
+      ),
+      GoRoute(
+        path: '/budgets/create/step3',
+        builder: (_, _) => const CreateBudgetStep3Page(),
+      ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),
         routes: [
@@ -110,20 +122,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/budgets',
             builder: (_, _) => const BudgetsPage(),
-            routes: [
-              GoRoute(
-                path: 'create/step1',
-                builder: (_, _) => const CreateBudgetStep1Page(),
-              ),
-              GoRoute(
-                path: 'create/step2',
-                builder: (_, _) => const CreateBudgetStep2Page(),
-              ),
-              GoRoute(
-                path: 'create/step3',
-                builder: (_, _) => const CreateBudgetStep3Page(),
-              ),
-            ],
           ),
           GoRoute(
             path: '/accounts',

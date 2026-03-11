@@ -8,11 +8,13 @@ class CreateBudgetState {
 
   String name = '';
   String recurrence = 'Monthly';
+  int startDay = 1;
   List<DraftArea> areas = [];
 
   void reset() {
     name = '';
     recurrence = 'Monthly';
+    startDay = 1;
     areas = [];
   }
 }

@@ -4,6 +4,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../data/dtos/subcategory_request_dto.dart';
 import '../data/models/category.dart';
 import '../data/subcategory_repository.dart';
+import 'categories_provider.dart';
 
 class SubcategoriesNotifier extends AsyncNotifier<List<CategorySubcategory>> {
   @override
@@ -30,6 +31,7 @@ class SubcategoriesNotifier extends AsyncNotifier<List<CategorySubcategory>> {
           CreateSubcategoryRequestDto(name: name, categoryId: categoryId),
         );
     state = AsyncData(dtos.map(CategorySubcategory.fromDto).toList());
+    ref.read(categoriesNotifierProvider.notifier).refresh();
   }
 
   Future<void> updateSubcategory(int id, String name, int categoryId) async {
@@ -37,11 +39,13 @@ class SubcategoriesNotifier extends AsyncNotifier<List<CategorySubcategory>> {
           UpdateSubcategoryRequestDto(id: id, name: name, categoryId: categoryId),
         );
     state = AsyncData(dtos.map(CategorySubcategory.fromDto).toList());
+    ref.read(categoriesNotifierProvider.notifier).refresh();
   }
 
   Future<void> delete(int id) async {
     final dtos = await ref.read(subcategoryRepositoryProvider).delete(id);
     state = AsyncData(dtos.map(CategorySubcategory.fromDto).toList());
+    ref.read(categoriesNotifierProvider.notifier).refresh();
   }
 }
 

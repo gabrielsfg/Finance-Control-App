@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,43 +8,44 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../../categories/data/models/category.dart';
+import '../../categories/providers/categories_provider.dart';
 import '../data/models/budget_models.dart';
 import 'budget_wizard_widgets.dart';
 import 'create_budget_state.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-class CreateBudgetStep2Page extends StatefulWidget {
+class CreateBudgetStep2Page extends ConsumerStatefulWidget {
   const CreateBudgetStep2Page({super.key});
 
   @override
-  State<CreateBudgetStep2Page> createState() => _CreateBudgetStep2PageState();
+  ConsumerState<CreateBudgetStep2Page> createState() =>
+      _CreateBudgetStep2PageState();
 }
 
-class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
+class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
   late List<DraftArea> _areas;
 
   @override
   void initState() {
     super.initState();
-    // Resume draft if returning from step 3
-    if (CreateBudgetState.instance.areas.isNotEmpty) {
-      _areas = CreateBudgetState.instance.areas;
-    } else {
-      _areas = [];
-    }
+    _areas = CreateBudgetState.instance.areas.isNotEmpty
+        ? CreateBudgetState.instance.areas
+        : [];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(categoriesNotifierProvider);
+    });
   }
+
+  Set<int> get _usedSubcategoryIds =>
+      _areas.expand((a) => a.subcategories).map((s) => s.id).toSet();
 
   bool get _canProceed =>
       _areas.isNotEmpty &&
       _areas.any((a) =>
-          a.categories.isNotEmpty &&
-          a.categories.any((c) =>
-              c.subcategories.any((s) => s.allocatedCents > 0)));
-
-  void _addArea() {
-    _showAddAreaSheet();
-  }
+          a.subcategories.isNotEmpty &&
+          a.subcategories.any((s) => s.allocatedCents > 0));
 
   void _next() {
     if (!_canProceed) return;
@@ -61,8 +63,7 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
         final t = AppThemeTokens.of(context);
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
+              bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Container(
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.all(20),
@@ -88,7 +89,7 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                 ),
                 const SizedBox(height: 14),
                 AppInputField(
-                  placeholder: 'e.g. Housing, Daily Life',
+                  placeholder: 'e.g. Housing, Leisure',
                   controller: nameController,
                   textCapitalization: TextCapitalization.words,
                 ),
@@ -99,7 +100,7 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                     final name = nameController.text.trim();
                     if (name.isEmpty) return;
                     setState(() {
-                      _areas.add(DraftArea(name: name, categories: []));
+                      _areas.add(DraftArea(name: name, subcategories: []));
                     });
                     Navigator.of(context).pop();
                   },
@@ -112,22 +113,31 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
     );
   }
 
-  void _addCategoryToArea(int areaIndex) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _CategoryPickerSheet(
-        existingCategoryIds: _areas[areaIndex]
-            .categories
-            .map((c) => c.id)
-            .toSet(),
-        availableCategories: const [],
-        onSelected: (cat) {
-          setState(() {
-            _areas[areaIndex].categories.add(cat);
-          });
-        },
+  void _showAddSubcategorySheet(int areaIndex) {
+    final categories = ref.read(categoriesNotifierProvider).valueOrNull ?? [];
+    final used = _usedSubcategoryIds;
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.5),
+        pageBuilder: (_, _, _) => _SubcategoryPickerPage(
+          categories: categories,
+          usedSubcategoryIds: used,
+          onSelected: (sub, cents, allocationType) {
+            setState(() {
+              _areas[areaIndex].subcategories.add(
+                    DraftSubcategory(
+                      id: sub.id,
+                      name: sub.name,
+                      categoryName: sub.categoryName ?? '',
+                      allocatedCents: cents,
+                      allocationType: allocationType,
+                    ),
+                  );
+            });
+          },
+        ),
       ),
     );
   }
@@ -162,10 +172,9 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                               : t.primary.withValues(alpha: 0.08),
                         ),
                         child: Center(
-                          child: Text(
-                            '←',
-                            style: TextStyle(fontSize: 18, color: t.txtPrimary),
-                          ),
+                          child: Text('←',
+                              style: TextStyle(
+                                  fontSize: 18, color: t.txtPrimary)),
                         ),
                       ),
                     ),
@@ -202,36 +211,38 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Group your categories into areas and set the amount for each subcategory.',
+                        'Create areas and add subcategories with a spending limit to each.',
                         style: AppTextStyles.body(t.txtSecondary).copyWith(
                           fontSize: 13,
                           height: 1.5,
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Areas list
                       ..._areas.asMap().entries.map((entry) {
-                        final areaIndex = entry.key;
+                        final i = entry.key;
                         final area = entry.value;
                         return _DraftAreaCard(
                           area: area,
-                          onAddCategory: () => _addCategoryToArea(areaIndex),
+                          onAddSubcategory: () =>
+                              _showAddSubcategorySheet(i),
                           onRemoveArea: () =>
-                              setState(() => _areas.removeAt(areaIndex)),
+                              setState(() => _areas.removeAt(i)),
                           onAmountChanged: () => setState(() {}),
+                          onRemoveSubcategory: (subId) => setState(() {
+                            _areas[i]
+                                .subcategories
+                                .removeWhere((s) => s.id == subId);
+                          }),
                         );
                       }),
-                      // Add area button
                       GestureDetector(
-                        onTap: _addArea,
+                        onTap: _showAddAreaSheet,
                         child: Container(
                           height: 52,
                           decoration: BoxDecoration(
                             borderRadius: AppRadius.lgAll,
                             border: Border.all(
-                              color: t.isDark
-                                  ? t.primary.withValues(alpha: 0.35)
-                                  : t.primary.withValues(alpha: 0.3),
+                              color: t.primary.withValues(alpha: 0.3),
                               width: 1.5,
                               strokeAlign: BorderSide.strokeAlignInside,
                             ),
@@ -239,11 +250,16 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('+', style: TextStyle(fontSize: 20, color: t.primary, height: 1)),
+                              Text('+',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      color: t.primary,
+                                      height: 1)),
                               const SizedBox(width: 6),
                               Text(
                                 'Add Area',
-                                style: AppTextStyles.body(t.primary).copyWith(
+                                style:
+                                    AppTextStyles.body(t.primary).copyWith(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -258,9 +274,9 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
                 ),
               ),
 
-              // ── Next button ────────────────────────────────────────────
               Padding(
-                padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPad + 20),
+                padding:
+                    EdgeInsets.fromLTRB(24, 16, 24, bottomPad + 20),
                 child: PrimaryButton(
                   label: 'Next: Review',
                   onPressed: _canProceed ? _next : null,
@@ -278,15 +294,17 @@ class _CreateBudgetStep2PageState extends State<CreateBudgetStep2Page> {
 
 class _DraftAreaCard extends StatefulWidget {
   final DraftArea area;
-  final VoidCallback onAddCategory;
+  final VoidCallback onAddSubcategory;
   final VoidCallback onRemoveArea;
   final VoidCallback onAmountChanged;
+  final void Function(int subId) onRemoveSubcategory;
 
   const _DraftAreaCard({
     required this.area,
-    required this.onAddCategory,
+    required this.onAddSubcategory,
     required this.onRemoveArea,
     required this.onAmountChanged,
+    required this.onRemoveSubcategory,
   });
 
   @override
@@ -299,7 +317,7 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final totalCents = widget.area.totalAllocatedCents;
+    final total = widget.area.totalAllocatedCents;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -307,7 +325,6 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            // Area header
             GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
               behavior: HitTestBehavior.opaque,
@@ -321,17 +338,19 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                         children: [
                           Text(
                             widget.area.name,
-                            style: AppTextStyles.body(t.txtPrimary).copyWith(
+                            style:
+                                AppTextStyles.body(t.txtPrimary).copyWith(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                             ),
                           ),
-                          if (totalCents > 0) ...[
+                          if (total > 0) ...[
                             const SizedBox(height: 2),
                             Text(
-                              formatCurrency(totalCents),
-                              style: AppTextStyles.mono(t.primary, fontSize: 12)
-                                  .copyWith(fontWeight: FontWeight.w600),
+                              formatCurrency(total),
+                              style: AppTextStyles.mono(t.txtSecondary,
+                                      fontSize: 14)
+                                  .copyWith(fontWeight: FontWeight.w700),
                             ),
                           ],
                         ],
@@ -339,23 +358,19 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                     ),
                     GestureDetector(
                       onTap: widget.onRemoveArea,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: t.error.withValues(alpha: 0.1),
-                        ),
-                        child: Center(
-                          child: Text('×', style: TextStyle(fontSize: 16, color: t.error, height: 1)),
-                        ),
-                      ),
+                      child: Text('×',
+                          style: TextStyle(
+                              fontSize: 22, color: t.error, height: 1)),
                     ),
                     const SizedBox(width: 6),
                     AnimatedRotation(
                       turns: _expanded ? 0.5 : 0.0,
                       duration: const Duration(milliseconds: 200),
-                      child: Text('▾', style: TextStyle(fontSize: 20, color: t.txtTertiary, height: 1)),
+                      child: Text('▾',
+                          style: TextStyle(
+                              fontSize: 20,
+                              color: t.txtTertiary,
+                              height: 1)),
                     ),
                   ],
                 ),
@@ -365,35 +380,31 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
               Divider(
                 height: 1,
                 thickness: 1,
-                color: t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
+                color:
+                    t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
               ),
-              // Categories
-              ...widget.area.categories.asMap().entries.map((entry) {
-                final catIndex = entry.key;
-                final cat = entry.value;
-                return _DraftCategorySection(
-                  category: cat,
-                  onRemove: () => setState(
-                    () => widget.area.categories.removeAt(catIndex),
-                  ),
-                  onAmountChanged: widget.onAmountChanged,
-                  showBottomDivider:
-                      catIndex < widget.area.categories.length - 1,
-                );
-              }),
-              // Add category button
+              ...widget.area.subcategories.map((sub) => _SubcategoryRow(
+                    sub: sub,
+                    onRemove: () =>
+                        widget.onRemoveSubcategory(sub.id),
+                    onAmountChanged: widget.onAmountChanged,
+                  )),
               GestureDetector(
-                onTap: widget.onAddCategory,
+                onTap: widget.onAddSubcategory,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      Text('+', style: TextStyle(fontSize: 18, color: t.primary, height: 1)),
+                      Text('+',
+                          style: TextStyle(
+                              fontSize: 18,
+                              color: t.primary,
+                              height: 1)),
                       const SizedBox(width: 6),
                       Text(
-                        'Add Category',
+                        'Add Subcategory',
                         style: AppTextStyles.bodySm(t.primary).copyWith(
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
@@ -411,123 +422,24 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
   }
 }
 
-// ── Draft Category Section ────────────────────────────────────────────────────
+// ── Subcategory Row (inline amount field) ─────────────────────────────────────
 
-class _DraftCategorySection extends StatefulWidget {
-  final DraftCategory category;
+class _SubcategoryRow extends StatefulWidget {
+  final DraftSubcategory sub;
   final VoidCallback onRemove;
   final VoidCallback onAmountChanged;
-  final bool showBottomDivider;
 
-  const _DraftCategorySection({
-    required this.category,
+  const _SubcategoryRow({
+    required this.sub,
     required this.onRemove,
     required this.onAmountChanged,
-    this.showBottomDivider = true,
   });
 
   @override
-  State<_DraftCategorySection> createState() => _DraftCategorySectionState();
+  State<_SubcategoryRow> createState() => _SubcategoryRowState();
 }
 
-class _DraftCategorySectionState extends State<_DraftCategorySection> {
-  bool _expanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppThemeTokens.of(context);
-    final cat = widget.category;
-    final total = cat.totalAllocatedCents;
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: cat.color.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 16))),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cat.name,
-                        style: AppTextStyles.body(t.txtPrimary).copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (total > 0)
-                        Text(
-                          formatCurrency(total),
-                          style: AppTextStyles.caption(t.primary)
-                              .copyWith(fontSize: 11),
-                        ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: widget.onRemove,
-                  child: Text('−', style: TextStyle(fontSize: 20, color: t.error, height: 1)),
-                ),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Text('▾', style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1)),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded) ...[
-          ...cat.subcategories.map((sub) => _SubcategoryAmountRow(
-                sub: sub,
-                onChanged: widget.onAmountChanged,
-              )),
-          const SizedBox(height: 4),
-        ],
-        if (widget.showBottomDivider)
-          Divider(
-            height: 1,
-            thickness: 1,
-            indent: 16,
-            endIndent: 16,
-            color: t.divider.withValues(alpha: t.isDark ? 0.25 : 0.45),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Subcategory Amount Row ────────────────────────────────────────────────────
-
-class _SubcategoryAmountRow extends StatefulWidget {
-  final DraftSubcategory sub;
-  final VoidCallback onChanged;
-
-  const _SubcategoryAmountRow({
-    required this.sub,
-    required this.onChanged,
-  });
-
-  @override
-  State<_SubcategoryAmountRow> createState() => _SubcategoryAmountRowState();
-}
-
-class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
+class _SubcategoryRowState extends State<_SubcategoryRow> {
   late TextEditingController _controller;
 
   @override
@@ -535,7 +447,7 @@ class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
     super.initState();
     _controller = TextEditingController(
       text: widget.sub.allocatedCents > 0
-          ? (widget.sub.allocatedCents / 100).toStringAsFixed(2)
+          ? (widget.sub.allocatedCents / 100).toStringAsFixed(2).replaceAll('.', ',')
           : '',
     );
   }
@@ -547,10 +459,8 @@ class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
   }
 
   void _onChanged(String value) {
-    final cleaned = value.replaceAll(',', '.');
-    final parsed = double.tryParse(cleaned) ?? 0.0;
-    widget.sub.allocatedCents = (parsed * 100).round();
-    widget.onChanged();
+    widget.sub.allocatedCents = CentsInputFormatter.parseCents(value);
+    widget.onAmountChanged();
   }
 
   @override
@@ -558,76 +468,81 @@ class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
     final t = AppThemeTokens.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(left: 58, right: 16, bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              widget.sub.name,
-              style: AppTextStyles.bodySm(t.txtSecondary).copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.sub.name,
+                  style: AppTextStyles.body(t.txtPrimary).copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (widget.sub.categoryName.isNotEmpty)
+                  Text(
+                    widget.sub.categoryName,
+                    style: AppTextStyles.caption(t.txtTertiary)
+                        .copyWith(fontSize: 11),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 110,
-            height: 36,
-            child: Container(
-              decoration: BoxDecoration(
-                color: t.isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : t.primary.withValues(alpha: 0.05),
-                borderRadius: AppRadius.smAll,
-                border: Border.all(
-                  color: t.isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : t.primary.withValues(alpha: 0.2),
+          const SizedBox(width: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              if (widget.sub.allocationType == 'Expense')
+                Text('- ',
+                    style: AppTextStyles.caption(t.error)
+                        .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text('R\$',
+                  style: AppTextStyles.caption(
+                          widget.sub.allocationType == 'Expense' ? t.error : t.success)
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(width: 2),
+              IntrinsicWidth(
+                child: TextField(
+                  controller: _controller,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    const CentsInputFormatter(),
+                  ],
+                  textAlign: TextAlign.right,
+                  onChanged: _onChanged,
+                  style: AppTextStyles.mono(
+                          widget.sub.allocationType == 'Expense' ? t.error : t.success,
+                          fontSize: 14)
+                      .copyWith(fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    hintText: '0,00',
+                    hintStyle: AppTextStyles.mono(
+                            (widget.sub.allocationType == 'Expense' ? t.error : t.success)
+                                .withValues(alpha: 0.35),
+                            fontSize: 14)
+                        .copyWith(fontWeight: FontWeight.w700),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Text(
-                      'R\$',
-                      style: AppTextStyles.caption(t.txtTertiary)
-                          .copyWith(fontSize: 11),
-                    ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d{0,9}([,\.]\d{0,2})?')),
-                      ],
-                      textAlign: TextAlign.right,
-                      onChanged: _onChanged,
-                      style: AppTextStyles.body(t.txtPrimary).copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '0,00',
-                        hintStyle: AppTextStyles.body(
-                          t.txtDisabled,
-                        ).copyWith(fontSize: 13),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 0),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: widget.onRemove,
+            child: Text('×',
+                style:
+                    TextStyle(fontSize: 20, color: t.error, height: 1)),
           ),
         ],
       ),
@@ -635,115 +550,497 @@ class _SubcategoryAmountRowState extends State<_SubcategoryAmountRow> {
   }
 }
 
-// ── Category Picker Sheet ─────────────────────────────────────────────────────
+// ── Subcategory Picker Page (full-screen) ────────────────────────────────────
 
-class _CategoryPickerSheet extends StatelessWidget {
-  final Set<int> existingCategoryIds;
-  final ValueChanged<DraftCategory> onSelected;
-  final List<DraftCategory> availableCategories;
+class _SubcategoryPickerPage extends StatefulWidget {
+  final List<Category> categories;
+  final Set<int> usedSubcategoryIds;
+  final void Function(CategorySubcategory sub, int cents, String allocationType) onSelected;
 
-  const _CategoryPickerSheet({
-    required this.existingCategoryIds,
+  const _SubcategoryPickerPage({
+    required this.categories,
+    required this.usedSubcategoryIds,
     required this.onSelected,
-    required this.availableCategories,
   });
+
+  @override
+  State<_SubcategoryPickerPage> createState() => _SubcategoryPickerPageState();
+}
+
+class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
+  final _searchController = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Category> get _filtered {
+    final q = _filter.trim().toLowerCase();
+    if (q.isEmpty) return widget.categories;
+    return widget.categories
+        .map((cat) {
+          final catMatches = cat.name.toLowerCase().contains(q);
+          final matchingSubs = cat.subcategories
+              .where((s) => s.name.toLowerCase().contains(q))
+              .toList();
+          if (!catMatches && matchingSubs.isEmpty) return null;
+          return Category(
+            id: cat.id,
+            name: cat.name,
+            subcategories: catMatches ? cat.subcategories : matchingSubs,
+          );
+        })
+        .whereType<Category>()
+        .where((c) => c.subcategories.isNotEmpty)
+        .toList();
+  }
+
+  void _onSubtap(CategorySubcategory sub) {
+    _showAmountSheet(sub);
+  }
+
+  void _showAmountSheet(CategorySubcategory sub) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AmountSheet(
+        subcategoryName: sub.name,
+        categoryName: sub.categoryName ?? '',
+        onConfirm: (cents, allocationType) {
+          widget.onSelected(sub, cents, allocationType);
+          Navigator.of(context).pop(); // close full-screen picker
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final available = availableCategories
-        .where((c) => !existingCategoryIds.contains(c.id))
-        .toList();
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final filtered = _filtered;
 
-    return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      decoration: BoxDecoration(
-        color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
-        borderRadius: AppRadius.xlAll,
-        border: Border.all(
-          color: t.isDark
-              ? Colors.white.withValues(alpha: 0.07)
-              : t.primary.withValues(alpha: 0.13),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select category',
-            style: AppTextStyles.body(t.txtPrimary).copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (available.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Text(
-                  'All categories are already added.',
-                  style: AppTextStyles.body(t.txtTertiary)
-                      .copyWith(fontSize: 13),
-                ),
-              ),
-            )
-          else
-            ...available.map((cat) {
-              return GestureDetector(
-                onTap: () {
-                  // Deep-copy so edits in this area don't affect another area
-                  final copy = DraftCategory(
-                    id: cat.id,
-                    name: cat.name,
-                    emoji: cat.emoji,
-                    color: cat.color,
-                    subcategories: cat.subcategories
-                        .map((s) => DraftSubcategory(
-                              id: s.id,
-                              name: s.name,
-                              allocatedCents: 0,
-                            ))
-                        .toList(),
-                  );
-                  onSelected(copy);
-                  Navigator.of(context).pop();
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    children: [
-                      Container(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        scrollable: false,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // App bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: cat.color.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
+                          color: t.isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : t.primary.withValues(alpha: 0.08),
                         ),
-                        child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 18))),
+                        child: Center(
+                          child: Text('←',
+                              style: TextStyle(
+                                  fontSize: 18, color: t.txtPrimary)),
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        cat.name,
-                        style: AppTextStyles.body(t.txtPrimary)
-                            .copyWith(fontSize: 14),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Select Subcategory',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.body(t.txtPrimary).copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                        ),
                       ),
-                      const Spacer(),
-                      Text(
-                        '${cat.subcategories.length} subcategories',
-                        style: AppTextStyles.bodySm(t.txtTertiary)
-                            .copyWith(fontSize: 11),
-                      ),
-                    ],
+                    ),
+                    const SizedBox(width: 36),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Search
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: t.isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : t.primary.withValues(alpha: 0.05),
+                    borderRadius: AppRadius.baseAll,
+                    border: Border.all(
+                        color: t.primary.withValues(alpha: 0.15)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _filter = v),
+                    style: AppTextStyles.body(t.txtPrimary)
+                        .copyWith(fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 11),
+                      hintText: 'Search subcategory...',
+                      hintStyle: AppTextStyles.body(t.txtDisabled)
+                          .copyWith(fontSize: 14),
+                      prefixIcon: Icon(Icons.search,
+                          size: 18, color: t.txtDisabled),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
                   ),
                 ),
-              );
-            }),
-          const SizedBox(height: 8),
-        ],
+              ),
+              const SizedBox(height: 8),
+
+              // List
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No subcategories available.',
+                          style: AppTextStyles.body(t.txtTertiary)
+                              .copyWith(fontSize: 14),
+                        ),
+                      )
+                    : ListView(
+                        padding: EdgeInsets.fromLTRB(
+                            16, 8, 16, bottomPad + 32),
+                        children: filtered.map((cat) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    top: 16, bottom: 8),
+                                child: Text(
+                                  cat.name.toUpperCase(),
+                                  style:
+                                      AppTextStyles.caption(t.primary)
+                                          .copyWith(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: t.isDark
+                                      ? const Color(0xFF1C1830)
+                                          .withValues(alpha: 0.72)
+                                      : Colors.white
+                                          .withValues(alpha: 0.9),
+                                  borderRadius: AppRadius.xlAll,
+                                  border: Border.all(
+                                    color: t.isDark
+                                        ? Colors.white
+                                            .withValues(alpha: 0.07)
+                                        : t.primary
+                                            .withValues(alpha: 0.12),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: cat.subcategories
+                                      .asMap()
+                                      .entries
+                                      .map((e) {
+                                    final sub = e.value;
+                                    final isLast = e.key ==
+                                        cat.subcategories.length - 1;
+                                    final isUsed = widget
+                                        .usedSubcategoryIds
+                                        .contains(sub.id);
+
+                                    return Column(
+                                      children: [
+                                        GestureDetector(
+                                          behavior:
+                                              HitTestBehavior.opaque,
+                                          onTap: isUsed
+                                              ? null
+                                              : () => _onSubtap(sub),
+                                          child: Padding(
+                                            padding: const EdgeInsets
+                                                .symmetric(
+                                                horizontal: 16,
+                                                vertical: 14),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    sub.name,
+                                                    style: AppTextStyles
+                                                        .body(isUsed
+                                                            ? t.txtDisabled
+                                                            : t.txtPrimary)
+                                                        .copyWith(
+                                                            fontSize:
+                                                                14),
+                                                  ),
+                                                ),
+                                                if (isUsed)
+                                                  Text(
+                                                    'Added',
+                                                    style: AppTextStyles
+                                                        .caption(
+                                                            t.txtDisabled)
+                                                        .copyWith(
+                                                            fontSize:
+                                                                11),
+                                                  )
+                                                else
+                                                  Icon(
+                                                    Icons.chevron_right,
+                                                    size: 18,
+                                                    color: t.txtDisabled,
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (!isLast)
+                                          Divider(
+                                            height: 1,
+                                            thickness: 1,
+                                            indent: 16,
+                                            color: t.divider.withValues(
+                                                alpha: t.isDark
+                                                    ? 0.2
+                                                    : 0.4),
+                                          ),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Amount Sheet ──────────────────────────────────────────────────────────────
+
+class _AmountSheet extends StatefulWidget {
+  final String subcategoryName;
+  final String categoryName;
+  final void Function(int cents, String allocationType) onConfirm;
+
+  const _AmountSheet({
+    required this.subcategoryName,
+    required this.categoryName,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_AmountSheet> createState() => _AmountSheetState();
+}
+
+class _AmountSheetState extends State<_AmountSheet> {
+  final _controller = TextEditingController(text: '0,00');
+  int _cents = 0;
+  String _allocationType = 'Expense';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final isExpense = _allocationType == 'Expense';
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          borderRadius: AppRadius.xlAll,
+          border: Border.all(
+            color: t.isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : t.primary.withValues(alpha: 0.13),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.subcategoryName,
+              style: AppTextStyles.body(t.txtPrimary).copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+            if (widget.categoryName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                widget.categoryName,
+                style: AppTextStyles.caption(t.txtTertiary)
+                    .copyWith(fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 16),
+            // ── Expense / Income toggle ──────────────────────────────────
+            Row(
+              children: [
+                _TypeChip(
+                  label: 'Expense',
+                  selected: isExpense,
+                  onTap: () => setState(() => _allocationType = 'Expense'),
+                  t: t,
+                ),
+                const SizedBox(width: 8),
+                _TypeChip(
+                  label: 'Income',
+                  selected: !isExpense,
+                  onTap: () => setState(() => _allocationType = 'Income'),
+                  t: t,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Spending limit',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                if (isExpense)
+                  Text(
+                    '- ',
+                    style: AppTextStyles.mono(t.primary, fontSize: 20)
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                Text(
+                  'R\$',
+                  style: AppTextStyles.mono(t.primary, fontSize: 20)
+                      .copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                IntrinsicWidth(
+                  stepWidth: 80,
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      const CentsInputFormatter(),
+                    ],
+                    onChanged: (v) => setState(
+                        () => _cents = CentsInputFormatter.parseCents(v)),
+                    style: AppTextStyles.mono(t.primary, fontSize: 32)
+                        .copyWith(
+                            fontWeight: FontWeight.w700, letterSpacing: -1),
+                    decoration: InputDecoration(
+                      hintText: '0,00',
+                      hintStyle: AppTextStyles.mono(
+                              t.primary.withValues(alpha: 0.35),
+                              fontSize: 32)
+                          .copyWith(
+                              fontWeight: FontWeight.w700, letterSpacing: -1),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              label: 'Add',
+              onPressed: _cents > 0
+                  ? () {
+                      widget.onConfirm(_cents, _allocationType);
+                      Navigator.of(context).pop();
+                    }
+                  : null,
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Type chip ─────────────────────────────────────────────────────────────────
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final AppThemeTokens t;
+
+  const _TypeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? t.primary.withValues(alpha: t.isDark ? 0.25 : 0.12)
+              : Colors.transparent,
+          borderRadius: AppRadius.fullAll,
+          border: Border.all(
+            color: selected
+                ? t.primary.withValues(alpha: 0.5)
+                : t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.bodySm(
+            selected ? t.primary : t.txtTertiary,
+          ).copyWith(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

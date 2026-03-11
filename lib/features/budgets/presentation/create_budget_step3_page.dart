@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,13 +8,48 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/budget_models.dart';
+import '../providers/budget_provider.dart';
 import 'budget_wizard_widgets.dart';
 import 'create_budget_state.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-class CreateBudgetStep3Page extends StatelessWidget {
+class CreateBudgetStep3Page extends ConsumerStatefulWidget {
   const CreateBudgetStep3Page({super.key});
+
+  @override
+  ConsumerState<CreateBudgetStep3Page> createState() =>
+      _CreateBudgetStep3PageState();
+}
+
+class _CreateBudgetStep3PageState
+    extends ConsumerState<CreateBudgetStep3Page> {
+  bool _isLoading = false;
+  String? _error;
+
+  Future<void> _confirm() async {
+    final s = CreateBudgetState.instance;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(budgetNotifierProvider.notifier).createBudget(
+            name: s.name,
+            recurrence: s.recurrence,
+            startDay: s.startDay,
+            areas: s.areas,
+          );
+      if (!mounted) return;
+      s.reset();
+      context.go('/budgets');
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to create budget. Please try again.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,10 +57,15 @@ class CreateBudgetStep3Page extends StatelessWidget {
     final t = AppThemeTokens.of(context);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
 
-    final totalCents = state.areas.fold<int>(
+    final totalIncomeCents = state.areas.fold<int>(
       0,
-      (sum, a) => sum + a.totalAllocatedCents,
+      (sum, a) => sum + a.totalIncomeCents,
     );
+    final totalExpenseCents = state.areas.fold<int>(
+      0,
+      (sum, a) => sum + a.totalExpenseCents,
+    );
+    final balanceCents = totalIncomeCents - totalExpenseCents;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -125,9 +166,36 @@ class CreateBudgetStep3Page extends StatelessWidget {
                                   .withValues(alpha: t.isDark ? 0.3 : 0.5),
                             ),
                             _SummaryRow(
-                              label: 'Total allocated',
-                              value: formatCurrency(totalCents),
-                              valueStyle: AppTextStyles.mono(t.primary,
+                              label: 'Total income',
+                              value: formatCurrency(totalIncomeCents),
+                              valueStyle: AppTextStyles.mono(t.success,
+                                      fontSize: 14)
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            Divider(
+                              height: 16,
+                              thickness: 1,
+                              color: t.divider
+                                  .withValues(alpha: t.isDark ? 0.3 : 0.5),
+                            ),
+                            _SummaryRow(
+                              label: 'Total expenses',
+                              value: '- ${formatCurrency(totalExpenseCents)}',
+                              valueStyle: AppTextStyles.mono(t.error,
+                                      fontSize: 14)
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            Divider(
+                              height: 16,
+                              thickness: 1,
+                              color: t.divider
+                                  .withValues(alpha: t.isDark ? 0.3 : 0.5),
+                            ),
+                            _SummaryRow(
+                              label: 'Balance',
+                              value: '${balanceCents < 0 ? '- ' : ''}${formatCurrency(balanceCents.abs())}',
+                              valueStyle: AppTextStyles.mono(
+                                      balanceCents >= 0 ? t.success : t.error,
                                       fontSize: 14)
                                   .copyWith(fontWeight: FontWeight.w700),
                             ),
@@ -153,16 +221,23 @@ class CreateBudgetStep3Page extends StatelessWidget {
                 ),
               ),
 
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _error!,
+                    style: AppTextStyles.bodySm(
+                      AppThemeTokens.of(context).error,
+                    ).copyWith(fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               // ── Confirm button ─────────────────────────────────────────
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPad + 20),
                 child: PrimaryButton(
-                  label: 'Create Budget',
-                  onPressed: () {
-                    // TODO: call create budget API endpoint
-                    CreateBudgetState.instance.reset();
-                    context.go('/budgets');
-                  },
+                  label: _isLoading ? 'Creating...' : 'Create Budget',
+                  onPressed: _isLoading ? null : _confirm,
                 ),
               ),
             ],
@@ -250,7 +325,7 @@ class _AreaSummaryCardState extends State<_AreaSummaryCard> {
                     ),
                     Text(
                       formatCurrency(area.totalAllocatedCents),
-                      style: AppTextStyles.mono(t.primary, fontSize: 13)
+                      style: AppTextStyles.mono(t.txtSecondary, fontSize: 14)
                           .copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 8),
@@ -263,20 +338,65 @@ class _AreaSummaryCardState extends State<_AreaSummaryCard> {
                 ),
               ),
             ),
-            if (_expanded) ...[
+            if (_expanded && area.subcategories.isNotEmpty) ...[
               Divider(
                 height: 1,
                 thickness: 1,
                 color: t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
               ),
-              ...area.categories.asMap().entries.map((catEntry) {
-                final cat = catEntry.value;
-                final isLastCat = catEntry.key == area.categories.length - 1;
-                return _CategorySummarySection(
-                  category: cat,
-                  showBottomDivider: !isLastCat,
+              ...area.subcategories.asMap().entries.map((entry) {
+                final sub = entry.value;
+                final isLast = entry.key == area.subcategories.length - 1;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  sub.name,
+                                  style: AppTextStyles.body(t.txtPrimary)
+                                      .copyWith(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500),
+                                ),
+                                if (sub.categoryName.isNotEmpty)
+                                  Text(
+                                    sub.categoryName,
+                                    style: AppTextStyles.caption(t.txtTertiary)
+                                        .copyWith(fontSize: 11),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${sub.allocationType == 'Expense' ? '- ' : ''}${formatCurrency(sub.allocatedCents)}',
+                            style: AppTextStyles.mono(
+                              sub.allocationType == 'Expense' ? t.error : t.success,
+                              fontSize: 13,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: t.divider
+                            .withValues(alpha: t.isDark ? 0.2 : 0.35),
+                      ),
+                  ],
                 );
               }),
+              const SizedBox(height: 6),
             ],
           ],
         ),
@@ -285,126 +405,3 @@ class _AreaSummaryCardState extends State<_AreaSummaryCard> {
   }
 }
 
-// ── Category Summary Section ──────────────────────────────────────────────────
-
-class _CategorySummarySection extends StatefulWidget {
-  final DraftCategory category;
-  final bool showBottomDivider;
-
-  const _CategorySummarySection({
-    required this.category,
-    this.showBottomDivider = true,
-  });
-
-  @override
-  State<_CategorySummarySection> createState() =>
-      _CategorySummarySectionState();
-}
-
-class _CategorySummarySectionState extends State<_CategorySummarySection> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppThemeTokens.of(context);
-    final cat = widget.category;
-    final allocated = cat.subcategories
-        .where((s) => s.allocatedCents > 0)
-        .toList();
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: cat.color.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(child: Text(cat.emoji, style: const TextStyle(fontSize: 16))),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    cat.name,
-                    style: AppTextStyles.body(t.txtPrimary).copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                Text(
-                  formatCurrency(cat.totalAllocatedCents),
-                  style: AppTextStyles.mono(t.txtSecondary, fontSize: 12)
-                      .copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Text('▾', style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1)),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded && allocated.isNotEmpty) ...[
-          ...allocated.asMap().entries.map((entry) {
-            final sub = entry.value;
-            final isLast = entry.key == allocated.length - 1;
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(
-                      left: 58, right: 16, top: 6, bottom: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        sub.name,
-                        style: AppTextStyles.bodySm(t.txtSecondary).copyWith(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        formatCurrency(sub.allocatedCents),
-                        style: AppTextStyles.mono(t.txtPrimary, fontSize: 12)
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isLast)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 58,
-                    endIndent: 16,
-                    color:
-                        t.divider.withValues(alpha: t.isDark ? 0.2 : 0.35),
-                  ),
-              ],
-            );
-          }),
-          const SizedBox(height: 6),
-        ],
-        if (widget.showBottomDivider)
-          Divider(
-            height: 1,
-            thickness: 1,
-            indent: 16,
-            endIndent: 16,
-            color: t.divider.withValues(alpha: t.isDark ? 0.25 : 0.45),
-          ),
-      ],
-    );
-  }
-}

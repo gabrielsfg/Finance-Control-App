@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,15 +8,82 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/budget_models.dart';
+import '../providers/budget_provider.dart';
+
+// ── Palette for category colors (deterministic by category ID) ────────────────
+
+const _kCategoryColors = [
+  Color(0xFF6C63FF),
+  Color(0xFF43B89C),
+  Color(0xFFFF6B6B),
+  Color(0xFFFFB347),
+  Color(0xFF4FC3F7),
+  Color(0xFFBA68C8),
+  Color(0xFF81C784),
+  Color(0xFFFF8A65),
+];
+
+Color _colorForCategory(int categoryId) =>
+    _kCategoryColors[categoryId % _kCategoryColors.length];
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-class BudgetsPage extends StatelessWidget {
+class BudgetsPage extends ConsumerWidget {
   const BudgetsPage({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final budgetAsync = ref.watch(budgetNotifierProvider);
+
+    return budgetAsync.when(
+      loading: () => const _LoadingView(),
+      error: (e, _) => _ErrorView(
+        onRetry: () => ref.read(budgetNotifierProvider.notifier).refresh(),
+      ),
+      data: (budget) =>
+          budget == null ? const _EmptyState() : _BudgetView(budget: budget),
+    );
+  }
+}
+
+// ── Loading ──────────────────────────────────────────────────────────────────
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
   Widget build(BuildContext context) {
-    return const _EmptyState();
+    final t = AppThemeTokens.of(context);
+    return AppBackground(
+      scrollable: false,
+      child: Center(child: CircularProgressIndicator(color: t.primary)),
+    );
+  }
+}
+
+// ── Error ────────────────────────────────────────────────────────────────────
+
+class _ErrorView extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    return AppBackground(
+      scrollable: false,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Failed to load budget',
+                style: AppTextStyles.body(t.txtSecondary)),
+            const SizedBox(height: 16),
+            PrimaryButton(label: 'Retry', onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -60,8 +128,8 @@ class _EmptyState extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: t.primary.withValues(alpha: 0.1),
                         ),
-                        child: Center(
-                          child: Text('📊', style: const TextStyle(fontSize: 44)),
+                        child: const Center(
+                          child: Text('📊', style: TextStyle(fontSize: 44)),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -460,6 +528,7 @@ class _CategorySectionState extends State<_CategorySection> {
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final cat = widget.category;
+    final color = _colorForCategory(cat.id);
 
     return Column(
       children: [
@@ -474,11 +543,17 @@ class _CategorySectionState extends State<_CategorySection> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: cat.color.withValues(alpha: 0.15),
+                    color: color.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text(cat.emoji, style: const TextStyle(fontSize: 18)),
+                    child: Text(
+                      cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: color,
+                          fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -601,8 +676,8 @@ class _SubcategoryRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatCurrency(sub.allocatedCents),
-                    style: AppTextStyles.mono(t.txtPrimary, fontSize: 12)
+                    '${sub.isExpense ? '- ' : ''}${formatCurrency(sub.allocatedCents)}',
+                    style: AppTextStyles.mono(t.primary, fontSize: 12)
                         .copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 1),
