@@ -10,22 +10,6 @@ import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/budget_models.dart';
 import '../providers/budget_provider.dart';
 
-// ── Palette for category colors (deterministic by category ID) ────────────────
-
-const _kCategoryColors = [
-  Color(0xFF6C63FF),
-  Color(0xFF43B89C),
-  Color(0xFFFF6B6B),
-  Color(0xFFFFB347),
-  Color(0xFF4FC3F7),
-  Color(0xFFBA68C8),
-  Color(0xFF81C784),
-  Color(0xFFFF8A65),
-];
-
-Color _colorForCategory(int categoryId) =>
-    _kCategoryColors[categoryId % _kCategoryColors.length];
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 class BudgetsPage extends ConsumerWidget {
@@ -152,8 +136,13 @@ class _EmptyState extends StatelessWidget {
                       const SizedBox(height: 32),
                       PrimaryButton(
                         label: 'Create Budget',
-                        icon: const Text('+', style: TextStyle(color: Colors.white, fontSize: 20, height: 1)),
-                        onPressed: () => context.push('/budgets/create/step1'),
+                        icon: const Text('+',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                height: 1)),
+                        onPressed: () =>
+                            context.push('/budgets/create/step1'),
                       ),
                     ],
                   ),
@@ -179,6 +168,7 @@ class _BudgetView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final hasOther = budget.otherTransactions.isNotEmpty;
 
     return AppBackground(
       scrollable: true,
@@ -201,6 +191,28 @@ class _BudgetView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  GestureDetector(
+                    onTap: () => context.push(
+                      '/budgets/edit',
+                      extra: budget,
+                    ),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: t.primary.withValues(alpha: 0.1),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: t.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () => context.push('/budgets/create/step1'),
                     child: Container(
@@ -237,6 +249,11 @@ class _BudgetView extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ...budget.areas.map((area) => _AreaCard(area: area)),
+              if (hasOther) ...[
+                const SizedBox(height: 4),
+                _OtherExpensesCard(
+                    transactions: budget.otherTransactions),
+              ],
               SizedBox(height: bottomPad + 76 + 24),
             ],
           ),
@@ -258,13 +275,13 @@ class _OverviewCard extends StatelessWidget {
     final t = AppThemeTokens.of(context);
     final period =
         '${formatDate(budget.startDate)} – ${formatDate(budget.endDate)}';
-    final percentStr = '${(budget.overallPercent * 100).round()}%';
-    final remaining = budget.totalAllocatedCents - budget.totalSpentCents;
+    final balance = budget.actualIncomeCents - budget.actualExpenseCents;
 
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header row ──────────────────────────────────────────────
           Row(
             children: [
               Expanded(
@@ -308,43 +325,79 @@ class _OverviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+
+          // ── 2×2 stats grid ───────────────────────────────────────────
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _OverviewStat(
-                label: 'Allocated',
-                value: formatCurrency(budget.totalAllocatedCents),
-                color: t.txtPrimary,
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Expected income',
+                  value: formatCurrency(budget.expectedIncomeCents),
+                  color: t.success.withValues(alpha: 0.7),
+                ),
               ),
-              _OverviewStat(
-                label: 'Spent',
-                value: formatCurrency(budget.totalSpentCents),
-                color: t.error,
-                align: TextAlign.center,
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Expected expenses',
+                  value: '- ${formatCurrency(budget.expectedExpenseCents)}',
+                  color: t.error.withValues(alpha: 0.7),
+                  align: TextAlign.end,
+                ),
               ),
-              _OverviewStat(
-                label: remaining >= 0 ? 'Remaining' : 'Over budget',
-                value: formatCurrency(remaining.abs()),
-                color: remaining >= 0 ? t.success : t.error,
-                align: TextAlign.end,
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Received',
+                  value: formatCurrency(budget.actualIncomeCents),
+                  color: t.success,
+                ),
+              ),
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Spent',
+                  value: '- ${formatCurrency(budget.actualExpenseCents)}',
+                  color: t.error,
+                  align: TextAlign.end,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          AppProgressBar(percent: budget.overallPercent),
-          const SizedBox(height: 8),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: t.divider.withValues(alpha: t.isDark ? 0.25 : 0.4),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Balance row ──────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '${budget.areas.length} area${budget.areas.length == 1 ? '' : 's'}',
-                style: AppTextStyles.bodySm(t.txtTertiary).copyWith(fontSize: 11),
+                style: AppTextStyles.bodySm(t.txtTertiary)
+                    .copyWith(fontSize: 11),
               ),
-              Text(
-                percentStr,
-                style: AppTextStyles.bodySm(
-                  budget.overallPercent >= 1.0 ? t.error : t.warning,
-                ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  Text(
+                    balance >= 0 ? 'Balance  ' : 'Deficit  ',
+                    style: AppTextStyles.bodySm(t.txtTertiary)
+                        .copyWith(fontSize: 11),
+                  ),
+                  Text(
+                    '${balance < 0 ? '- ' : ''}${formatCurrency(balance.abs())}',
+                    style: AppTextStyles.mono(
+                      balance >= 0 ? t.success : t.error,
+                      fontSize: 12,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
             ],
           ),
@@ -370,16 +423,15 @@ class _OverviewStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
+    final crossAxis = align == TextAlign.end
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start;
     return Column(
-      crossAxisAlignment: align == TextAlign.start
-          ? CrossAxisAlignment.start
-          : align == TextAlign.end
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.center,
+      crossAxisAlignment: crossAxis,
       children: [
         Text(
           label,
-          style: AppTextStyles.caption(t.txtTertiary).copyWith(fontSize: 11),
+          style: AppTextStyles.caption(t.txtTertiary).copyWith(fontSize: 10),
         ),
         const SizedBox(height: 2),
         Text(
@@ -412,6 +464,8 @@ class _AreaCardState extends State<_AreaCard> {
     final t = AppThemeTokens.of(context);
     final area = widget.area;
     final percentStr = '${(area.spentPercent * 100).round()}%';
+    final isIncome = area.isIncome;
+    final actionLabel = isIncome ? 'received' : 'spent';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -419,7 +473,6 @@ class _AreaCardState extends State<_AreaCard> {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            // Area header — tapping toggles category list
             GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
               behavior: HitTestBehavior.opaque,
@@ -457,7 +510,10 @@ class _AreaCardState extends State<_AreaCard> {
                           duration: const Duration(milliseconds: 200),
                           child: Text(
                             '▾',
-                            style: TextStyle(fontSize: 20, color: t.txtTertiary, height: 1),
+                            style: TextStyle(
+                                fontSize: 20,
+                                color: t.txtTertiary,
+                                height: 1),
                           ),
                         ),
                       ],
@@ -466,15 +522,20 @@ class _AreaCardState extends State<_AreaCard> {
                     AppProgressBar(percent: area.spentPercent),
                     const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${formatCurrency(area.spentCents)} spent',
-                          style: AppTextStyles.bodySm(t.txtSecondary)
-                              .copyWith(fontSize: 11),
+                          formatCurrency(area.spentCents),
+                          style: AppTextStyles.mono(
+                            area.spentPercent >= 1.0
+                                ? t.error
+                                : area.spentPercent >= 0.8
+                                    ? t.warning
+                                    : t.primary,
+                            fontSize: 11,
+                          ).copyWith(fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          'of ${formatCurrency(area.allocatedCents)}',
+                          '/${formatCurrency(area.allocatedCents)} $actionLabel',
                           style: AppTextStyles.bodySm(t.txtTertiary)
                               .copyWith(fontSize: 11),
                         ),
@@ -484,153 +545,31 @@ class _AreaCardState extends State<_AreaCard> {
                 ),
               ),
             ),
-            // Categories
             if (_expanded) ...[
               Divider(
                 height: 1,
                 thickness: 1,
-                color: t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
+                color: t.divider
+                    .withValues(alpha: t.isDark ? 0.3 : 0.5),
               ),
-              ...area.categories.asMap().entries.map((entry) {
-                final isLast = entry.key == area.categories.length - 1;
-                return _CategorySection(
-                  category: entry.value,
-                  showBottomDivider: !isLast,
-                );
-              }),
+              // Flatten all subcategories from all categories in this area
+              ...() {
+                final allSubs = area.categories
+                    .expand((c) => c.subcategories)
+                    .toList();
+                return allSubs.asMap().entries.map((entry) {
+                  final isLast = entry.key == allSubs.length - 1;
+                  return _SubcategoryRow(
+                    sub: entry.value,
+                    showDivider: !isLast,
+                  );
+                });
+              }(),
+              const SizedBox(height: 6),
             ],
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Category Section ─────────────────────────────────────────────────────────
-
-class _CategorySection extends StatefulWidget {
-  final BudgetCategory category;
-  final bool showBottomDivider;
-
-  const _CategorySection({
-    required this.category,
-    this.showBottomDivider = true,
-  });
-
-  @override
-  State<_CategorySection> createState() => _CategorySectionState();
-}
-
-class _CategorySectionState extends State<_CategorySection> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppThemeTokens.of(context);
-    final cat = widget.category;
-    final color = _colorForCategory(cat.id);
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                          fontSize: 16,
-                          color: color,
-                          fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cat.name,
-                        style: AppTextStyles.body(t.txtPrimary).copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AppProgressBar(percent: cat.spentPercent),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${(cat.spentPercent * 100).round()}%',
-                            style: AppTextStyles.caption(
-                              cat.spentPercent >= 1.0
-                                  ? t.error
-                                  : cat.spentPercent >= 0.8
-                                      ? t.warning
-                                      : t.primary,
-                            ).copyWith(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  formatCurrency(cat.allocatedCents),
-                  style: AppTextStyles.mono(t.txtSecondary, fontSize: 12)
-                      .copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    '▾',
-                    style: TextStyle(fontSize: 16, color: t.txtDisabled, height: 1),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded) ...[
-          ...cat.subcategories.asMap().entries.map((entry) {
-            final isLast = entry.key == cat.subcategories.length - 1;
-            return _SubcategoryRow(
-              sub: entry.value,
-              showDivider: !isLast,
-            );
-          }),
-          const SizedBox(height: 6),
-        ],
-        if (widget.showBottomDivider)
-          Divider(
-            height: 1,
-            thickness: 1,
-            indent: 16,
-            endIndent: 16,
-            color: t.divider.withValues(alpha: t.isDark ? 0.25 : 0.45),
-          ),
-      ],
     );
   }
 }
@@ -647,50 +586,57 @@ class _SubcategoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final isOver = sub.spentCents > sub.allocatedCents;
+    final accentColor = sub.isExpense ? t.error : t.success;
+    final actionLabel = sub.isExpense ? 'spent' : 'received';
 
     return Column(
       children: [
         Padding(
           padding:
-              const EdgeInsets.only(left: 62, right: 16, top: 8, bottom: 8),
-          child: Row(
+              const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              // ── Name + over indicator ──────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
                       sub.name,
                       style: AppTextStyles.bodySm(t.txtSecondary).copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    AppProgressBar(percent: sub.spentPercent),
-                  ],
-                ),
+                  ),
+                  if (isOver)
+                    Text(
+                      '+${formatCurrency(sub.spentCents - sub.allocatedCents)} over',
+                      style: AppTextStyles.caption(t.error)
+                          .copyWith(fontSize: 10),
+                    ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              const SizedBox(height: 4),
+              // ── spent / allocated values ───────────────────────────────
+              Row(
                 children: [
                   Text(
-                    '${sub.isExpense ? '- ' : ''}${formatCurrency(sub.allocatedCents)}',
-                    style: AppTextStyles.mono(t.primary, fontSize: 12)
-                        .copyWith(fontWeight: FontWeight.w600),
+                    formatCurrency(sub.spentCents),
+                    style: AppTextStyles.mono(
+                      isOver ? t.error : accentColor,
+                      fontSize: 11,
+                    ).copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 1),
                   Text(
-                    isOver
-                        ? '+${formatCurrency(sub.spentCents - sub.allocatedCents)} over'
-                        : '${formatCurrency(sub.spentCents)} spent',
-                    style: AppTextStyles.caption(
-                      isOver ? t.error : t.txtTertiary,
-                    ).copyWith(fontSize: 10),
+                    '/${formatCurrency(sub.allocatedCents)} $actionLabel',
+                    style: AppTextStyles.mono(t.txtTertiary, fontSize: 11),
                   ),
                 ],
               ),
+              const SizedBox(height: 5),
+              // ── Progress bar ───────────────────────────────────────────
+              AppProgressBar(percent: sub.spentPercent),
             ],
           ),
         ),
@@ -698,11 +644,164 @@ class _SubcategoryRow extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 1,
-            indent: 62,
+            indent: 16,
             endIndent: 16,
-            color: t.divider.withValues(alpha: t.isDark ? 0.2 : 0.35),
+            color:
+                t.divider.withValues(alpha: t.isDark ? 0.2 : 0.35),
           ),
       ],
+    );
+  }
+}
+
+// ── Other Expenses Card ───────────────────────────────────────────────────────
+
+class _OtherExpensesCard extends StatefulWidget {
+  final List<UnallocatedTransaction> transactions;
+
+  const _OtherExpensesCard({required this.transactions});
+
+  @override
+  State<_OtherExpensesCard> createState() => _OtherExpensesCardState();
+}
+
+class _OtherExpensesCardState extends State<_OtherExpensesCard> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    // Aggregate by subcategory name for a cleaner display
+    final Map<String, int> aggregated = {};
+    final Map<String, String> typeByName = {};
+    for (final tx in widget.transactions) {
+      aggregated[tx.subCategoryName] =
+          (aggregated[tx.subCategoryName] ?? 0) + tx.valueCents;
+      typeByName[tx.subCategoryName] = tx.type;
+    }
+
+    final totalExpense = widget.transactions
+        .where((t) => t.isExpense)
+        .fold(0, (sum, t) => sum + t.valueCents);
+    final totalIncome = widget.transactions
+        .where((t) => !t.isExpense)
+        .fold(0, (sum, t) => sum + t.valueCents);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Other transactions',
+                            style: AppTextStyles.body(t.txtPrimary).copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Text('▾',
+                              style: TextStyle(
+                                  fontSize: 20,
+                                  color: t.txtTertiary,
+                                  height: 1)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (totalExpense > 0)
+                          Text(
+                            '- ${formatCurrency(totalExpense)} spent',
+                            style: AppTextStyles.bodySm(t.error)
+                                .copyWith(fontSize: 11),
+                          ),
+                        if (totalExpense > 0 && totalIncome > 0)
+                          Text('  ·  ',
+                              style: AppTextStyles.bodySm(t.txtTertiary)
+                                  .copyWith(fontSize: 11)),
+                        if (totalIncome > 0)
+                          Text(
+                            '${formatCurrency(totalIncome)} received',
+                            style: AppTextStyles.bodySm(t.success)
+                                .copyWith(fontSize: 11),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded) ...[
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: t.divider
+                    .withValues(alpha: t.isDark ? 0.3 : 0.5),
+              ),
+              ...aggregated.entries.toList().asMap().entries.map((entry) {
+                final isLast = entry.key == aggregated.length - 1;
+                final name = entry.value.key;
+                final cents = entry.value.value;
+                final isExpense = typeByName[name] == 'Expense';
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 11),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style:
+                                  AppTextStyles.bodySm(t.txtSecondary)
+                                      .copyWith(fontSize: 13),
+                            ),
+                          ),
+                          Text(
+                            '${isExpense ? '- ' : ''}${formatCurrency(cents)}',
+                            style: AppTextStyles.mono(
+                              isExpense ? t.error : t.success,
+                              fontSize: 13,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: t.divider
+                            .withValues(alpha: t.isDark ? 0.2 : 0.35),
+                      ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 4),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

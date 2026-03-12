@@ -5,9 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
 import 'dtos/allocation_request_dto.dart';
 import 'dtos/allocation_response_dto.dart';
-import 'dtos/area_response_dto.dart';
 import 'dtos/budget_response_dto.dart';
-import 'dtos/create_area_request_dto.dart';
 import 'dtos/create_budget_request_dto.dart';
 import 'dtos/update_budget_request_dto.dart';
 
@@ -31,6 +29,13 @@ class BudgetRepository {
 
   Future<GetBudgetByIdResponseDto> getBudgetById(int id) async {
     final response = await _dio.get(ApiEndpoints.budgetById(id));
+    return GetBudgetByIdResponseDto.fromJson(
+        response.data as Map<String, dynamic>);
+  }
+
+  /// Returns the budget with all areas, allocations and spent values per allocation.
+  Future<GetBudgetByIdResponseDto> getBudgetWithAllocations(int id) async {
+    final response = await _dio.get(ApiEndpoints.budgetWithAllocations(id));
     return GetBudgetByIdResponseDto.fromJson(
         response.data as Map<String, dynamic>);
   }
@@ -62,19 +67,7 @@ class BudgetRepository {
         .toList();
   }
 
-  // ── Areas ──────────────────────────────────────────────────────────────────
-
-  Future<AreaResponseDto> createArea(int budgetId, String name) async {
-    final response = await _dio.post(
-      ApiEndpoints.budgetAreas,
-      data: CreateAreaRequestDto(budgetId: budgetId, name: name).toJson(),
-    );
-    // Response is a list of all areas; return the last created one
-    final list = response.data as List;
-    return AreaResponseDto.fromJson(list.last as Map<String, dynamic>);
-  }
-
-  // ── Allocations ────────────────────────────────────────────────────────────
+  // ── Allocations (granular endpoints — available for future use) ────────────
 
   Future<List<AllocationByAreaResponseDto>> getAllocations(
       int budgetId) async {

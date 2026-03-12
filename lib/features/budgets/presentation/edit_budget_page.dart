@@ -10,50 +10,211 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../categories/data/models/category.dart';
 import '../../categories/providers/categories_provider.dart';
+import '../data/budget_repository.dart';
+import '../data/dtos/update_budget_request_dto.dart';
 import '../data/models/budget_models.dart';
-import 'budget_wizard_widgets.dart';
-import 'create_budget_state.dart';
+import '../providers/budget_provider.dart';
 
-// ── Page ───────────────────────────────────────────────────────────────────
+// ── Recurrence options ────────────────────────────────────────────────────────
 
-class CreateBudgetStep2Page extends ConsumerStatefulWidget {
-  const CreateBudgetStep2Page({super.key});
+final _kRecurrenceOptions = [
+  'Monthly',
+  'Weekly',
+  'Biweekly',
+  'Semiannually',
+  'Annually',
+];
 
-  @override
-  ConsumerState<CreateBudgetStep2Page> createState() =>
-      _CreateBudgetStep2PageState();
+// ── Editable draft models ─────────────────────────────────────────────────────
+
+class _EditDraftSubcategory {
+  final int? allocationId; // null = new
+  final int subcategoryId;
+  final String name;
+  final String categoryName;
+  final String allocationType;
+  int allocatedCents;
+
+  _EditDraftSubcategory({
+    required this.allocationId,
+    required this.subcategoryId,
+    required this.name,
+    required this.categoryName,
+    required this.allocationType,
+    required this.allocatedCents,
+  });
 }
 
-class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
-  late List<DraftArea> _areas;
+class _EditDraftArea {
+  final int? areaId; // null = new
+  String name;
+  final String allocationType; // 'Income' | 'Expense'
+  final List<_EditDraftSubcategory> subcategories;
+
+  _EditDraftArea({
+    required this.areaId,
+    required this.name,
+    required this.allocationType,
+    required this.subcategories,
+  });
+
+  int get totalCents =>
+      subcategories.fold(0, (s, x) => s + x.allocatedCents);
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
+
+class EditBudgetPage extends ConsumerStatefulWidget {
+  final Budget budget;
+
+  const EditBudgetPage({super.key, required this.budget});
+
+  @override
+  ConsumerState<EditBudgetPage> createState() => _EditBudgetPageState();
+}
+
+class _EditBudgetPageState extends ConsumerState<EditBudgetPage> {
+  late TextEditingController _nameController;
+  late String _recurrence;
+  late int _startDay;
+  late List<_EditDraftArea> _areas;
+
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _areas = CreateBudgetState.instance.incomeAreas.isNotEmpty
-        ? CreateBudgetState.instance.incomeAreas
-        : [];
+    final b = widget.budget;
+    _nameController = TextEditingController(text: b.name);
+    _recurrence = b.recurrence;
+    _startDay = b.startDate.day;
+
+    _areas = b.areas.map((area) {
+      final allSubs = area.categories.expand((c) => c.subcategories).toList();
+      return _EditDraftArea(
+        areaId: area.id,
+        name: area.name,
+        allocationType: area.allocationType,
+        subcategories: allSubs
+            .map((s) => _EditDraftSubcategory(
+                  allocationId: s.allocationId,
+                  subcategoryId: s.id,
+                  name: s.name,
+                  categoryName: '',
+                  allocationType: s.allocationType,
+                  allocatedCents: s.allocatedCents,
+                ))
+            .toList(),
+      );
+    }).toList();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(categoriesNotifierProvider);
     });
   }
 
-  Set<int> get _usedSubcategoryIds =>
-      _areas.expand((a) => a.subcategories).map((s) => s.id).toSet();
-
-  bool get _canProceed =>
-      _areas.isNotEmpty &&
-      _areas.any((a) =>
-          a.subcategories.isNotEmpty &&
-          a.subcategories.any((s) => s.allocatedCents > 0));
-
-  void _next() {
-    if (!_canProceed) return;
-    CreateBudgetState.instance.incomeAreas = _areas;
-    context.push('/budgets/create/step3');
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
   }
 
-  void _showAddAreaSheet() {
+  Set<int> get _usedSubcategoryIds =>
+      _areas.expand((a) => a.subcategories).map((s) => s.subcategoryId).toSet();
+
+  bool get _canSave => _nameController.text.trim().isNotEmpty;
+
+  Future<void> _save() async {
+    if (!_canSave) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dto = UpdateBudgetRequestDto(
+        id: widget.budget.id,
+        name: _nameController.text.trim(),
+        startDate: _startDay,
+        recurrence: _recurrence,
+        isActive: true,
+        areas: _areas.map((a) {
+          return UpdateAreaInBudgetDto(
+            id: a.areaId,
+            name: a.name,
+            allocations: a.subcategories
+                .where((s) => s.allocatedCents > 0)
+                .map((s) => UpdateAllocationInBudgetDto(
+                      id: s.allocationId,
+                      subCategoryId: s.subcategoryId,
+                      expectedValue: s.allocatedCents,
+                      allocationType: s.allocationType,
+                    ))
+                .toList(),
+          );
+        }).toList(),
+      );
+      await ref
+          .read(budgetRepositoryProvider)
+          .updateBudget(dto);
+      await ref.read(budgetNotifierProvider.notifier).refresh();
+      if (!mounted) return;
+      context.pop();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to save. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _deleteBudget() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final t = AppThemeTokens.of(ctx);
+        return AlertDialog(
+          backgroundColor:
+              t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          title: Text('Delete budget?',
+              style: AppTextStyles.h3(t.txtPrimary)),
+          content: Text(
+            'This will permanently delete "${widget.budget.name}" and all its data.',
+            style: AppTextStyles.body(t.txtSecondary).copyWith(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child:
+                  Text('Cancel', style: AppTextStyles.body(t.txtTertiary)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Delete',
+                  style: AppTextStyles.body(t.error)
+                      .copyWith(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      await ref
+          .read(budgetNotifierProvider.notifier)
+          .deleteBudget(widget.budget.id);
+      if (!mounted) return;
+      context.go('/budgets');
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to delete. Please try again.';
+      });
+    }
+  }
+
+  void _addArea(String allocationType) {
     final nameController = TextEditingController();
     showModalBottomSheet(
       context: context,
@@ -62,8 +223,8 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
       builder: (_) {
         final t = AppThemeTokens.of(context);
         return Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Container(
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.all(20),
@@ -82,14 +243,13 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
               children: [
                 Text(
                   'Area name',
-                  style: AppTextStyles.body(t.txtPrimary).copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+                  style: AppTextStyles.body(t.txtPrimary)
+                      .copyWith(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
                 const SizedBox(height: 14),
                 AppInputField(
-                  placeholder: 'e.g. Salary, Freelance',
+                  placeholder:
+                      allocationType == 'Income' ? 'e.g. Salary' : 'e.g. Housing',
                   controller: nameController,
                   textCapitalization: TextCapitalization.words,
                 ),
@@ -100,7 +260,12 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
                     final name = nameController.text.trim();
                     if (name.isEmpty) return;
                     setState(() {
-                      _areas.add(DraftArea(name: name, subcategories: []));
+                      _areas.add(_EditDraftArea(
+                        areaId: null,
+                        name: name,
+                        allocationType: allocationType,
+                        subcategories: [],
+                      ));
                     });
                     Navigator.of(context).pop();
                   },
@@ -113,9 +278,10 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
     );
   }
 
-  void _showAddSubcategorySheet(int areaIndex) {
+  void _showSubcategoryPicker(int areaIndex) {
     final categories = ref.read(categoriesNotifierProvider).valueOrNull ?? [];
     final used = _usedSubcategoryIds;
+    final area = _areas[areaIndex];
 
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -126,14 +292,14 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
           usedSubcategoryIds: used,
           onSelected: (sub, cents) {
             setState(() {
-              _areas[areaIndex].subcategories.add(
-                    DraftSubcategory(
-                      id: sub.id,
-                      name: sub.name,
-                      categoryName: sub.categoryName ?? '',
-                      allocatedCents: cents,
-                    ),
-                  );
+              area.subcategories.add(_EditDraftSubcategory(
+                allocationId: null,
+                subcategoryId: sub.id,
+                name: sub.name,
+                categoryName: sub.categoryName ?? '',
+                allocationType: area.allocationType,
+                allocatedCents: cents,
+              ));
             });
           },
         ),
@@ -145,6 +311,10 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final incomeAreas =
+        _areas.where((a) => a.allocationType == 'Income').toList();
+    final expenseAreas =
+        _areas.where((a) => a.allocationType == 'Expense').toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -154,7 +324,7 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
           bottom: false,
           child: Column(
             children: [
-              // ── App bar ────────────────────────────────────────────────
+              // ── App bar ─────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
@@ -172,14 +342,14 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
                         ),
                         child: Center(
                           child: Text('←',
-                              style: TextStyle(
-                                  fontSize: 18, color: t.txtPrimary)),
+                              style:
+                                  TextStyle(fontSize: 18, color: t.txtPrimary)),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Text(
-                        'New Budget',
+                        'Edit Budget',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.body(t.txtPrimary).copyWith(
                           fontWeight: FontWeight.w700,
@@ -187,64 +357,210 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 36),
+                    GestureDetector(
+                      onTap: _isLoading ? null : _deleteBudget,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.error.withValues(alpha: 0.1),
+                        ),
+                        child: Center(
+                          child: Icon(Icons.delete_outline,
+                              size: 18, color: t.error),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              const BudgetStepIndicator(current: 2),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
+              // ── Scrollable content ───────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   padding: AppSpacing.screenPadding.copyWith(bottom: 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ── Basic info ────────────────────────────────────
                       Text(
-                        'Expected income',
-                        style: AppTextStyles.h2(t.txtPrimary).copyWith(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
+                        'Budget details',
+                        style: AppTextStyles.caption(t.txtSecondary).copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Create areas and add subcategories with the expected income for each.',
-                        style: AppTextStyles.body(t.txtSecondary).copyWith(
-                          fontSize: 13,
-                          height: 1.5,
+                      const SizedBox(height: 10),
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppInputField(
+                              label: 'Budget name',
+                              placeholder: 'e.g. Fixed Costs',
+                              controller: _nameController,
+                              textCapitalization: TextCapitalization.sentences,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Recurrence',
+                              style: AppTextStyles.caption(t.txtSecondary)
+                                  .copyWith(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _kRecurrenceOptions.map((opt) {
+                                final selected = _recurrence == opt;
+                                return GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _recurrence = opt),
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? t.primary.withValues(
+                                              alpha: t.isDark ? 0.2 : 0.1)
+                                          : t.isDark
+                                              ? Colors.white
+                                                  .withValues(alpha: 0.05)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.7),
+                                      borderRadius: AppRadius.pillAll,
+                                      border: Border.all(
+                                        color: selected
+                                            ? t.primary.withValues(
+                                                alpha: t.isDark ? 0.55 : 0.4)
+                                            : t.primary
+                                                .withValues(alpha: 0.15),
+                                        width: selected ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      opt,
+                                      style: AppTextStyles.bodySm(
+                                        selected ? t.primary : t.txtSecondary,
+                                      ).copyWith(
+                                        fontSize: 13,
+                                        fontWeight: selected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Start day of month',
+                              style: AppTextStyles.caption(t.txtSecondary)
+                                  .copyWith(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: t.isDark
+                                    ? Colors.white.withValues(alpha: 0.04)
+                                    : Colors.white.withValues(alpha: 0.7),
+                                borderRadius: AppRadius.baseAll,
+                                border: Border.all(
+                                  color: t.isDark
+                                      ? Colors.white.withValues(alpha: 0.07)
+                                      : t.primary.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _startDay,
+                                  isExpanded: true,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  borderRadius: AppRadius.baseAll,
+                                  dropdownColor: t.isDark
+                                      ? const Color(0xFF1C1830)
+                                      : Colors.white,
+                                  icon: Text('▾',
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          color: t.txtTertiary,
+                                          height: 1)),
+                                  style: AppTextStyles.body(t.txtPrimary)
+                                      .copyWith(fontSize: 14),
+                                  items: List.generate(31, (i) {
+                                    final day = i + 1;
+                                    return DropdownMenuItem(
+                                      value: day,
+                                      child: Text('Day $day',
+                                          style: AppTextStyles.body(
+                                                  t.txtPrimary)
+                                              .copyWith(fontSize: 14)),
+                                    );
+                                  }),
+                                  onChanged: (d) {
+                                    if (d != null) {
+                                      setState(() => _startDay = d);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      ..._areas.asMap().entries.map((entry) {
-                        final i = entry.key;
-                        final area = entry.value;
-                        return _DraftAreaCard(
+                      const SizedBox(height: 24),
+
+                      // ── Income areas ──────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Income areas',
+                              style: AppTextStyles.caption(t.success).copyWith(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ...incomeAreas.map((area) {
+                        final i = _areas.indexOf(area);
+                        return _EditAreaCard(
                           area: area,
-                          allocationType: 'Income',
-                          onAddSubcategory: () =>
-                              _showAddSubcategorySheet(i),
+                          onAddSubcategory: () => _showSubcategoryPicker(i),
                           onRemoveArea: () =>
                               setState(() => _areas.removeAt(i)),
                           onAmountChanged: () => setState(() {}),
                           onRemoveSubcategory: (subId) => setState(() {
-                            _areas[i]
-                                .subcategories
-                                .removeWhere((s) => s.id == subId);
+                            area.subcategories
+                                .removeWhere((s) => s.subcategoryId == subId);
                           }),
                         );
                       }),
                       GestureDetector(
-                        onTap: _showAddAreaSheet,
+                        onTap: () => _addArea('Income'),
                         child: Container(
-                          height: 52,
+                          height: 48,
                           decoration: BoxDecoration(
                             borderRadius: AppRadius.lgAll,
                             border: Border.all(
                               color: t.success.withValues(alpha: 0.4),
                               width: 1.5,
-                              strokeAlign: BorderSide.strokeAlignInside,
                             ),
                           ),
                           child: Row(
@@ -258,11 +574,65 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
                               const SizedBox(width: 6),
                               Text(
                                 'Add Income Area',
-                                style:
-                                    AppTextStyles.body(t.success).copyWith(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: AppTextStyles.body(t.success).copyWith(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Expense areas ─────────────────────────────────
+                      Text(
+                        'Expense areas',
+                        style: AppTextStyles.caption(t.error).copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...expenseAreas.map((area) {
+                        final i = _areas.indexOf(area);
+                        return _EditAreaCard(
+                          area: area,
+                          onAddSubcategory: () => _showSubcategoryPicker(i),
+                          onRemoveArea: () =>
+                              setState(() => _areas.removeAt(i)),
+                          onAmountChanged: () => setState(() {}),
+                          onRemoveSubcategory: (subId) => setState(() {
+                            area.subcategories
+                                .removeWhere((s) => s.subcategoryId == subId);
+                          }),
+                        );
+                      }),
+                      GestureDetector(
+                        onTap: () => _addArea('Expense'),
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadius.lgAll,
+                            border: Border.all(
+                              color: t.error.withValues(alpha: 0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('+',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      color: t.error,
+                                      height: 1)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Add Expense Area',
+                                style: AppTextStyles.body(t.error).copyWith(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
@@ -274,12 +644,22 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
                 ),
               ),
 
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _error!,
+                    style:
+                        AppTextStyles.bodySm(t.error).copyWith(fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               Padding(
                 padding:
                     EdgeInsets.fromLTRB(24, 16, 24, bottomPad + 20),
                 child: PrimaryButton(
-                  label: 'Next: Expenses',
-                  onPressed: _canProceed ? _next : null,
+                  label: _isLoading ? 'Saving...' : 'Save Changes',
+                  onPressed: (_isLoading || !_canSave) ? null : _save,
                 ),
               ),
             ],
@@ -290,19 +670,17 @@ class _CreateBudgetStep2PageState extends ConsumerState<CreateBudgetStep2Page> {
   }
 }
 
-// ── Draft Area Card ───────────────────────────────────────────────────────────
+// ── Edit Area Card ────────────────────────────────────────────────────────────
 
-class _DraftAreaCard extends StatefulWidget {
-  final DraftArea area;
-  final String allocationType;
+class _EditAreaCard extends StatefulWidget {
+  final _EditDraftArea area;
   final VoidCallback onAddSubcategory;
   final VoidCallback onRemoveArea;
   final VoidCallback onAmountChanged;
   final void Function(int subId) onRemoveSubcategory;
 
-  const _DraftAreaCard({
+  const _EditAreaCard({
     required this.area,
-    required this.allocationType,
     required this.onAddSubcategory,
     required this.onRemoveArea,
     required this.onAmountChanged,
@@ -310,18 +688,20 @@ class _DraftAreaCard extends StatefulWidget {
   });
 
   @override
-  State<_DraftAreaCard> createState() => _DraftAreaCardState();
+  State<_EditAreaCard> createState() => _EditAreaCardState();
 }
 
-class _DraftAreaCardState extends State<_DraftAreaCard> {
+class _EditAreaCardState extends State<_EditAreaCard> {
   bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final total = widget.area.totalAllocatedCents;
-    final isIncome = widget.allocationType == 'Income';
+    final area = widget.area;
+    final isIncome = area.allocationType == 'Income';
     final accentColor = isIncome ? t.success : t.error;
+    final prefix = isIncome ? '' : '- ';
+    final total = area.totalCents;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -341,19 +721,16 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.area.name,
-                            style:
-                                AppTextStyles.body(t.txtPrimary).copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
+                            area.name,
+                            style: AppTextStyles.body(t.txtPrimary).copyWith(
+                                fontWeight: FontWeight.w700, fontSize: 15),
                           ),
                           if (total > 0) ...[
                             const SizedBox(height: 2),
                             Text(
-                              formatCurrency(total),
+                              '$prefix${formatCurrency(total)}',
                               style: AppTextStyles.mono(accentColor,
-                                      fontSize: 14)
+                                      fontSize: 13)
                                   .copyWith(fontWeight: FontWeight.w700),
                             ),
                           ],
@@ -363,8 +740,8 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                     GestureDetector(
                       onTap: widget.onRemoveArea,
                       child: Text('×',
-                          style: TextStyle(
-                              fontSize: 22, color: t.error, height: 1)),
+                          style:
+                              TextStyle(fontSize: 22, color: t.error, height: 1)),
                     ),
                     const SizedBox(width: 6),
                     AnimatedRotation(
@@ -372,9 +749,7 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                       duration: const Duration(milliseconds: 200),
                       child: Text('▾',
                           style: TextStyle(
-                              fontSize: 20,
-                              color: t.txtTertiary,
-                              height: 1)),
+                              fontSize: 20, color: t.txtTertiary, height: 1)),
                     ),
                   ],
                 ),
@@ -382,16 +757,15 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
             ),
             if (_expanded) ...[
               Divider(
-                height: 1,
-                thickness: 1,
-                color:
-                    t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
-              ),
-              ...widget.area.subcategories.map((sub) => _SubcategoryRow(
+                  height: 1,
+                  thickness: 1,
+                  color: t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5)),
+              ...area.subcategories.map((sub) => _EditSubcategoryRow(
                     sub: sub,
                     accentColor: accentColor,
+                    prefix: prefix,
                     onRemove: () =>
-                        widget.onRemoveSubcategory(sub.id),
+                        widget.onRemoveSubcategory(sub.subcategoryId),
                     onAmountChanged: widget.onAmountChanged,
                   )),
               GestureDetector(
@@ -404,16 +778,13 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
                     children: [
                       Text('+',
                           style: TextStyle(
-                              fontSize: 18,
-                              color: accentColor,
-                              height: 1)),
+                              fontSize: 18, color: accentColor, height: 1)),
                       const SizedBox(width: 6),
                       Text(
                         'Add Subcategory',
-                        style: AppTextStyles.bodySm(accentColor).copyWith(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                        ),
+                        style: AppTextStyles.bodySm(accentColor)
+                            .copyWith(
+                                fontWeight: FontWeight.w500, fontSize: 13),
                       ),
                     ],
                   ),
@@ -427,26 +798,28 @@ class _DraftAreaCardState extends State<_DraftAreaCard> {
   }
 }
 
-// ── Subcategory Row (inline amount field) ─────────────────────────────────────
+// ── Edit Subcategory Row ──────────────────────────────────────────────────────
 
-class _SubcategoryRow extends StatefulWidget {
-  final DraftSubcategory sub;
+class _EditSubcategoryRow extends StatefulWidget {
+  final _EditDraftSubcategory sub;
   final Color accentColor;
+  final String prefix;
   final VoidCallback onRemove;
   final VoidCallback onAmountChanged;
 
-  const _SubcategoryRow({
+  const _EditSubcategoryRow({
     required this.sub,
     required this.accentColor,
+    required this.prefix,
     required this.onRemove,
     required this.onAmountChanged,
   });
 
   @override
-  State<_SubcategoryRow> createState() => _SubcategoryRowState();
+  State<_EditSubcategoryRow> createState() => _EditSubcategoryRowState();
 }
 
-class _SubcategoryRowState extends State<_SubcategoryRow> {
+class _EditSubcategoryRowState extends State<_EditSubcategoryRow> {
   late TextEditingController _controller;
 
   @override
@@ -456,7 +829,8 @@ class _SubcategoryRowState extends State<_SubcategoryRow> {
         ? const CentsInputFormatter()
             .formatEditUpdate(
               TextEditingValue.empty,
-              TextEditingValue(text: widget.sub.allocatedCents.toString()),
+              TextEditingValue(
+                  text: widget.sub.allocatedCents.toString()),
             )
             .text
         : '';
@@ -489,9 +863,7 @@ class _SubcategoryRowState extends State<_SubcategoryRow> {
                 Text(
                   widget.sub.name,
                   style: AppTextStyles.body(t.txtPrimary).copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                      fontSize: 13, fontWeight: FontWeight.w500),
                 ),
                 if (widget.sub.categoryName.isNotEmpty)
                   Text(
@@ -507,9 +879,11 @@ class _SubcategoryRowState extends State<_SubcategoryRow> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text('R\$',
-                  style: AppTextStyles.caption(widget.accentColor)
-                      .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(
+                '${widget.prefix}R\$',
+                style: AppTextStyles.caption(widget.accentColor)
+                    .copyWith(fontSize: 12, fontWeight: FontWeight.w500),
+              ),
               const SizedBox(width: 2),
               IntrinsicWidth(
                 child: TextField(
@@ -544,8 +918,7 @@ class _SubcategoryRowState extends State<_SubcategoryRow> {
           GestureDetector(
             onTap: widget.onRemove,
             child: Text('×',
-                style:
-                    TextStyle(fontSize: 20, color: t.error, height: 1)),
+                style: TextStyle(fontSize: 20, color: t.error, height: 1)),
           ),
         ],
       ),
@@ -553,7 +926,7 @@ class _SubcategoryRowState extends State<_SubcategoryRow> {
   }
 }
 
-// ── Subcategory Picker Page (full-screen) ────────────────────────────────────
+// ── Subcategory Picker Page ───────────────────────────────────────────────────
 
 class _SubcategoryPickerPage extends StatefulWidget {
   final List<Category> categories;
@@ -567,7 +940,8 @@ class _SubcategoryPickerPage extends StatefulWidget {
   });
 
   @override
-  State<_SubcategoryPickerPage> createState() => _SubcategoryPickerPageState();
+  State<_SubcategoryPickerPage> createState() =>
+      _SubcategoryPickerPageState();
 }
 
 class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
@@ -601,10 +975,6 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
         .toList();
   }
 
-  void _onSubtap(CategorySubcategory sub) {
-    _showAmountSheet(sub);
-  }
-
   void _showAmountSheet(CategorySubcategory sub) {
     showModalBottomSheet(
       context: context,
@@ -615,7 +985,7 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
         categoryName: sub.categoryName ?? '',
         onConfirm: (cents) {
           widget.onSelected(sub, cents);
-          Navigator.of(context).pop(); // close full-screen picker
+          Navigator.of(context).pop();
         },
       ),
     );
@@ -635,7 +1005,6 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
           bottom: false,
           child: Column(
             children: [
-              // App bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
@@ -663,9 +1032,7 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                         'Select Subcategory',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.body(t.txtPrimary).copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 17,
-                        ),
+                            fontWeight: FontWeight.w700, fontSize: 17),
                       ),
                     ),
                     const SizedBox(width: 36),
@@ -673,8 +1040,6 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Search
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
@@ -709,8 +1074,6 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                 ),
               ),
               const SizedBox(height: 8),
-
-              // List
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -721,20 +1084,19 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                         ),
                       )
                     : ListView(
-                        padding: EdgeInsets.fromLTRB(
-                            16, 8, 16, bottomPad + 32),
+                        padding:
+                            EdgeInsets.fromLTRB(16, 8, 16, bottomPad + 32),
                         children: filtered.map((cat) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(
-                                    top: 16, bottom: 8),
+                                padding:
+                                    const EdgeInsets.only(top: 16, bottom: 8),
                                 child: Text(
                                   cat.name.toUpperCase(),
                                   style:
-                                      AppTextStyles.caption(t.primary)
-                                          .copyWith(
+                                      AppTextStyles.caption(t.primary).copyWith(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.8,
@@ -746,15 +1108,12 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                                   color: t.isDark
                                       ? const Color(0xFF1C1830)
                                           .withValues(alpha: 0.72)
-                                      : Colors.white
-                                          .withValues(alpha: 0.9),
+                                      : Colors.white.withValues(alpha: 0.9),
                                   borderRadius: AppRadius.xlAll,
                                   border: Border.all(
                                     color: t.isDark
-                                        ? Colors.white
-                                            .withValues(alpha: 0.07)
-                                        : t.primary
-                                            .withValues(alpha: 0.12),
+                                        ? Colors.white.withValues(alpha: 0.07)
+                                        : t.primary.withValues(alpha: 0.12),
                                   ),
                                 ),
                                 child: Column(
@@ -763,55 +1122,43 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                                       .entries
                                       .map((e) {
                                     final sub = e.value;
-                                    final isLast = e.key ==
-                                        cat.subcategories.length - 1;
-                                    final isUsed = widget
-                                        .usedSubcategoryIds
+                                    final isLast =
+                                        e.key == cat.subcategories.length - 1;
+                                    final isUsed = widget.usedSubcategoryIds
                                         .contains(sub.id);
-
                                     return Column(
                                       children: [
                                         GestureDetector(
-                                          behavior:
-                                              HitTestBehavior.opaque,
+                                          behavior: HitTestBehavior.opaque,
                                           onTap: isUsed
                                               ? null
-                                              : () => _onSubtap(sub),
+                                              : () => _showAmountSheet(sub),
                                           child: Padding(
-                                            padding: const EdgeInsets
-                                                .symmetric(
-                                                horizontal: 16,
-                                                vertical: 14),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 14),
                                             child: Row(
                                               children: [
                                                 Expanded(
                                                   child: Text(
                                                     sub.name,
-                                                    style: AppTextStyles
-                                                        .body(isUsed
-                                                            ? t.txtDisabled
-                                                            : t.txtPrimary)
-                                                        .copyWith(
-                                                            fontSize:
-                                                                14),
+                                                    style: AppTextStyles.body(
+                                                            isUsed
+                                                                ? t.txtDisabled
+                                                                : t.txtPrimary)
+                                                        .copyWith(fontSize: 14),
                                                   ),
                                                 ),
                                                 if (isUsed)
                                                   Text(
                                                     'Added',
                                                     style: AppTextStyles
-                                                        .caption(
-                                                            t.txtDisabled)
-                                                        .copyWith(
-                                                            fontSize:
-                                                                11),
+                                                        .caption(t.txtDisabled)
+                                                        .copyWith(fontSize: 11),
                                                   )
                                                 else
-                                                  Icon(
-                                                    Icons.chevron_right,
-                                                    size: 18,
-                                                    color: t.txtDisabled,
-                                                  ),
+                                                  Icon(Icons.chevron_right,
+                                                      size: 18,
+                                                      color: t.txtDisabled),
                                               ],
                                             ),
                                           ),
@@ -822,9 +1169,8 @@ class _SubcategoryPickerPageState extends State<_SubcategoryPickerPage> {
                                             thickness: 1,
                                             indent: 16,
                                             color: t.divider.withValues(
-                                                alpha: t.isDark
-                                                    ? 0.2
-                                                    : 0.4),
+                                                alpha:
+                                                    t.isDark ? 0.2 : 0.4),
                                           ),
                                       ],
                                     );
@@ -896,10 +1242,8 @@ class _AmountSheetState extends State<_AmountSheet> {
           children: [
             Text(
               widget.subcategoryName,
-              style: AppTextStyles.body(t.txtPrimary).copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
+              style: AppTextStyles.body(t.txtPrimary)
+                  .copyWith(fontWeight: FontWeight.w700, fontSize: 16),
             ),
             if (widget.categoryName.isNotEmpty) ...[
               const SizedBox(height: 2),
@@ -945,8 +1289,7 @@ class _AmountSheetState extends State<_AmountSheet> {
                     decoration: InputDecoration(
                       hintText: '0,00',
                       hintStyle: AppTextStyles.mono(
-                              t.primary.withValues(alpha: 0.35),
-                              fontSize: 32)
+                              t.primary.withValues(alpha: 0.35), fontSize: 32)
                           .copyWith(
                               fontWeight: FontWeight.w700, letterSpacing: -1),
                       filled: false,

@@ -44,6 +44,7 @@ class AllocationSubcategoryDto {
     required this.subCategoryName,
     required this.subCategoryExpectedValue,
     required this.allocationType,
+    this.spentValue = 0,
   });
 
   final int allocationId;
@@ -51,6 +52,7 @@ class AllocationSubcategoryDto {
   final String subCategoryName;
   final int subCategoryExpectedValue;
   final String allocationType;
+  final int spentValue;
 
   factory AllocationSubcategoryDto.fromJson(Map<String, dynamic> json) =>
       _$AllocationSubcategoryDtoFromJson(json);

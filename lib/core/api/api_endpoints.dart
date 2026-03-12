@@ -15,7 +15,18 @@ abstract class ApiEndpoints {
   static String accountById(int id) => '/api/Account/$id';
 
   // Transactions
-  static const String transactions = '/api/Transaction';
+  static const String transactions = '/api/transaction';
+  static String transactionById(int id) => '/api/transaction/$id';
+  static String transactionsByBudget(int budgetId) =>
+      '/api/transaction/by-budget/$budgetId';
+  static String transactionsByAccount(int accountId) =>
+      '/api/transaction/by-account/$accountId';
+  static String transactionsBySubcategory(int subCategoryId) =>
+      '/api/transaction/by-subcategory/$subCategoryId';
+  static String updateRecurringTransaction(int recurringId) =>
+      '/api/transaction/$recurringId/recurring';
+  static String cancelRecurringTransaction(int recurringId) =>
+      '/api/transaction/$recurringId/recurring/cancel';
 
   // Categories (transaction picker — includes system categories)
   static const String categories = '/api/categories';
@@ -35,6 +46,7 @@ abstract class ApiEndpoints {
   static const String budgets = '/api/budget';
   static const String allBudgets = '/api/budget/all';
   static String budgetById(int id) => '/api/budget/by-id/$id';
+  static String budgetWithAllocations(int id) => '/api/budget/$id/allocation';
 
   // Budget Areas
   static const String budgetAreas = '/api/area';
