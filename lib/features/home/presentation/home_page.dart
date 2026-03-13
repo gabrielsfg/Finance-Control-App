@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -6,101 +7,15 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
-import '../../transactions/data/models/transaction_item.dart';
-import '../data/models/category_preview.dart';
+import '../data/models/home_summary.dart';
+import '../providers/home_provider.dart';
 
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kUserName = 'Gabriel';
-const _kUserInitials = 'GF';
-
-const _kBalance = 384752;  // R$ 3.847,52
-const _kIncome  = 520000;  // R$ 5.200,00
-const _kExpense = 135248;  // R$ 1.352,48
-
-const _kBudgetName    = 'Fixed Costs';
-const _kBudgetPercent = 0.85;
-const _kBudgetSpent   = 161500; // R$ 1.615,00
-
-const _kCategories = [
-  CategoryPreview('Housing',   '🏠', 180000, 0xFF8B5CF6),
-  CategoryPreview('Food',      '🍔', 48720,  0xFFF59E0B),
-  CategoryPreview('Transport', '🚗', 21000,  0xFF06B6D4),
-  CategoryPreview('Health',    '❤️', 15600,  0xFFEF4444),
-];
-
-final _kTransactions = [
-  TransactionItem(
-    name: 'Rent',
-    subtitle: 'Housing · Rent',
-    amountCents: -180000,
-    emoji: '🏠',
-    color: 0xFF8B5CF6,
-    date: DateTime(2026, 2, 15),
-    category: 'Housing',
-    subcategory: 'Rent',
-    account: 'Nubank',
-    type: 'Expense',
-    recurrence: 'Monthly',
-  ),
-  TransactionItem(
-    name: 'iFood',
-    subtitle: 'Food · Delivery',
-    amountCents: -6790,
-    emoji: '🍔',
-    color: 0xFFF59E0B,
-    date: DateTime(2026, 2, 18),
-    category: 'Food',
-    subcategory: 'Delivery',
-    account: 'Nubank',
-    type: 'Expense',
-  ),
-  TransactionItem(
-    name: 'Uber',
-    subtitle: 'Transport · Ride',
-    amountCents: -3240,
-    emoji: '🚗',
-    color: 0xFF06B6D4,
-    date: DateTime(2026, 2, 14),
-    category: 'Transport',
-    subcategory: 'Ride',
-    account: 'Nubank',
-    type: 'Expense',
-  ),
-  TransactionItem(
-    name: 'Salary',
-    subtitle: 'Income · Work',
-    amountCents: 520000,
-    emoji: '💼',
-    color: 0xFF22C55E,
-    date: DateTime(2026, 2, 18),
-    category: 'Income',
-    subcategory: 'Salary',
-    account: 'Nubank',
-    type: 'Income',
-    recurrence: 'Monthly',
-  ),
-  TransactionItem(
-    name: 'Pharmacy',
-    subtitle: 'Health · Medicine',
-    amountCents: -4580,
-    emoji: '💊',
-    color: 0xFFEF4444,
-    date: DateTime(2026, 2, 14),
-    category: 'Health',
-    subcategory: 'Medicine',
-    account: 'Nubank',
-    type: 'Expense',
-  ),
-];
-
-// ── Page ───────────────────────────────────────────────────────────────────
-
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncState = ref.watch(homeNotifierProvider);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
 
     return AppBackground(
@@ -109,22 +24,36 @@ class HomePage extends StatelessWidget {
         bottom: false,
         child: Padding(
           padding: AppSpacing.screenPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              const _Header(),
-              const SizedBox(height: 20),
-              const _BalanceCard(),
-              const SizedBox(height: 14),
-              const _BudgetCard(),
-              const SizedBox(height: 24),
-              const _TopCategoriesSection(),
-              const SizedBox(height: 24),
-              const _RecentTransactionsSection(),
-              // Space for nav bar + FAB + bottom safe area
-              SizedBox(height: bottomPad + 76 + 24),
-            ],
+          child: asyncState.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 120),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => _ErrorView(
+              message: e.toString(),
+              onRetry: () =>
+                  ref.read(homeNotifierProvider.notifier).refresh(),
+            ),
+            data: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                _Header(startDate: state.startDate),
+                const SizedBox(height: 20),
+                _BalanceCard(summary: state.summary),
+                const SizedBox(height: 14),
+                _BudgetCard(summary: state.summary),
+                const SizedBox(height: 24),
+                _TopCategoriesSection(
+                  categories: state.summary?.topCategories ?? [],
+                ),
+                const SizedBox(height: 24),
+                _RecentTransactionsSection(
+                  transactions: state.summary?.recentTransactions ?? [],
+                ),
+                SizedBox(height: bottomPad + 76 + 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -132,16 +61,58 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// ── Header ─────────────────────────────────────────────────────────────────
+// ── Error view ──────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
-  const _Header();
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final now = DateTime.now();
-    final monthLabel = '${monthName(now.month)} ${now.year}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 48, color: t.txtTertiary),
+          const SizedBox(height: 12),
+          Text(
+            'Failed to load data',
+            style: AppTextStyles.body(t.txtPrimary)
+                .copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            style: AppTextStyles.bodySm(t.txtTertiary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 160,
+            child: PrimaryButton(label: 'Try again', onPressed: onRetry),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  const _Header({required this.startDate});
+
+  final DateTime startDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final monthLabel = '${monthName(startDate.month)} ${startDate.year}';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,27 +121,24 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hello, $_kUserName 👋',
-                style: AppTextStyles.body(t.txtSecondary),
-              ),
+              Text('Hello 👋', style: AppTextStyles.body(t.txtSecondary)),
               const SizedBox(height: 2),
               Text(monthLabel, style: AppTextStyles.h1(t.txtPrimary)),
             ],
           ),
         ),
         const ThemeToggleButton(),
-        const SizedBox(width: 8),
-        const AppAvatar(initials: _kUserInitials, size: 44),
       ],
     );
   }
 }
 
-// ── Balance Card ───────────────────────────────────────────────────────────
+// ── Balance Card ─────────────────────────────────────────────────────────────
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard();
+  const _BalanceCard({required this.summary});
+
+  final HomeSummary? summary;
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +156,9 @@ class _BalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            formatCurrency(_kBalance),
+            summary != null
+                ? '${summary!.balance < 0 ? '-' : ''}${formatCurrency(summary!.balance)}'
+                : '—',
             textAlign: TextAlign.center,
             style: AppTextStyles.moneyLg(t.txtPrimary).copyWith(fontSize: 34),
           ),
@@ -198,7 +168,9 @@ class _BalanceCard extends StatelessWidget {
               Expanded(
                 child: _MiniCard(
                   label: 'INCOME',
-                  value: formatCurrency(_kIncome),
+                  value: summary != null
+                      ? formatCurrency(summary!.totalIncome)
+                      : '—',
                   isIncome: true,
                 ),
               ),
@@ -206,7 +178,9 @@ class _BalanceCard extends StatelessWidget {
               Expanded(
                 child: _MiniCard(
                   label: 'EXPENSES',
-                  value: formatCurrency(_kExpense),
+                  value: summary != null
+                      ? formatCurrency(summary!.totalExpenses)
+                      : '—',
                   isIncome: false,
                 ),
               ),
@@ -219,21 +193,21 @@ class _BalanceCard extends StatelessWidget {
 }
 
 class _MiniCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool isIncome;
-
   const _MiniCard({
     required this.label,
     required this.value,
     required this.isIncome,
   });
 
+  final String label;
+  final String value;
+  final bool isIncome;
+
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final color = isIncome ? t.success : t.error;
-    final bg    = isIncome ? t.incomeBg : t.expenseBg;
+    final bg = isIncome ? t.incomeBg : t.expenseBg;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -245,7 +219,8 @@ class _MiniCard extends StatelessWidget {
             children: [
               Text(
                 isIncome ? '↑' : '↓',
-                style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    fontSize: 13, color: color, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 4),
               Text(
@@ -269,15 +244,25 @@ class _MiniCard extends StatelessWidget {
   }
 }
 
-// ── Budget Card ────────────────────────────────────────────────────────────
+// ── Budget Card ───────────────────────────────────────────────────────────────
 
 class _BudgetCard extends StatelessWidget {
-  const _BudgetCard();
+  const _BudgetCard({required this.summary});
+
+  final HomeSummary? summary;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final percentStr = '${(_kBudgetPercent * 100).round()}%';
+
+    final percent = summary != null
+        ? (summary!.budgetSpentPercentage / 100).clamp(0.0, 1.0)
+        : 0.0;
+    final percentStr = summary != null
+        ? '${summary!.budgetSpentPercentage.round()}%'
+        : '—';
+    final spentStr =
+        summary != null ? formatCurrency(summary!.budgetTotalSpent) : '—';
 
     return GlassCard(
       child: Column(
@@ -291,7 +276,7 @@ class _BudgetCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'ACTIVE BUDGET',
+                      'BUDGET',
                       style: AppTextStyles.caption(t.txtTertiary).copyWith(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -299,7 +284,10 @@ class _BudgetCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(_kBudgetName, style: AppTextStyles.h3(t.txtPrimary)),
+                    Text(
+                      'Current period',
+                      style: AppTextStyles.h3(t.txtPrimary),
+                    ),
                   ],
                 ),
               ),
@@ -311,12 +299,12 @@ class _BudgetCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const AppProgressBar(percent: _kBudgetPercent),
+          AppProgressBar(percent: percent),
           const SizedBox(height: 10),
           Row(
             children: [
               Text(
-                '${formatCurrency(_kBudgetSpent)} spent',
+                '$spentStr spent',
                 style: AppTextStyles.bodySm(t.txtSecondary),
               ),
               const Spacer(),
@@ -336,14 +324,18 @@ class _BudgetCard extends StatelessWidget {
   }
 }
 
-// ── Top Categories ─────────────────────────────────────────────────────────
+// ── Top Categories ────────────────────────────────────────────────────────────
 
 class _TopCategoriesSection extends StatelessWidget {
-  const _TopCategoriesSection();
+  const _TopCategoriesSection({required this.categories});
+
+  final List<TopCategorySummary> categories;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
+
+    if (categories.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,9 +346,8 @@ class _TopCategoriesSection extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           clipBehavior: Clip.none,
           child: Row(
-            children: _kCategories
-                .map((cat) => _CategoryChip(data: cat))
-                .toList(),
+            children:
+                categories.map((cat) => _CategoryChip(data: cat)).toList(),
           ),
         ),
       ],
@@ -365,8 +356,9 @@ class _TopCategoriesSection extends StatelessWidget {
 }
 
 class _CategoryChip extends StatelessWidget {
-  final CategoryPreview data;
   const _CategoryChip({required this.data});
+
+  final TopCategorySummary data;
 
   @override
   Widget build(BuildContext context) {
@@ -393,21 +385,30 @@ class _CategoryChip extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Color(data.color).withValues(alpha: 0.15),
+              color: t.primary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Center(
-              child: Text(data.emoji, style: const TextStyle(fontSize: 22)),
+              child: Text(
+                data.categoryName.isNotEmpty
+                    ? data.categoryName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: t.primary,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            data.name,
+            data.categoryName,
             style: AppTextStyles.bodySm(t.txtSecondary).copyWith(fontSize: 12),
           ),
           const SizedBox(height: 2),
           Text(
-            formatCurrency(data.amountCents),
+            formatCurrency(data.totalSpentCents),
             style: AppTextStyles.body(t.txtPrimary).copyWith(
               fontWeight: FontWeight.w600,
               fontSize: 13,
@@ -419,15 +420,18 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-// ── Recent Transactions ────────────────────────────────────────────────────
+// ── Recent Transactions ───────────────────────────────────────────────────────
 
 class _RecentTransactionsSection extends StatelessWidget {
-  const _RecentTransactionsSection();
+  const _RecentTransactionsSection({required this.transactions});
+
+  final List<RecentTransactionSummary> transactions;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final items = _kTransactions.take(5).toList();
+
+    if (transactions.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,10 +454,10 @@ class _RecentTransactionsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        ...List.generate(items.length, (i) {
-          return _TransactionItem(
-            data: items[i],
-            showDivider: i < items.length - 1,
+        ...List.generate(transactions.length, (i) {
+          return _TransactionRow(
+            data: transactions[i],
+            showDivider: i < transactions.length - 1,
           );
         }),
       ],
@@ -461,69 +465,71 @@ class _RecentTransactionsSection extends StatelessWidget {
   }
 }
 
-class _TransactionItem extends StatelessWidget {
-  final TransactionItem data;
-  final bool showDivider;
+class _TransactionRow extends StatelessWidget {
+  const _TransactionRow({required this.data, this.showDivider = true});
 
-  const _TransactionItem({required this.data, this.showDivider = true});
+  final RecentTransactionSummary data;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final isExpense   = data.amountCents < 0;
-    final amountColor = isExpense ? t.error : t.success;
-    final sign        = isExpense ? '-' : '+';
-    final amountStr   = '$sign${formatCurrency(data.amountCents.abs())}';
+    final amountColor = data.isExpense ? t.error : t.success;
+    final sign = data.isExpense ? '-' : '+';
+    final amountStr = '$sign${formatCurrency(data.valueCents.abs())}';
+    final subtitle = '${data.categoryName} · ${data.subCategoryName}';
 
     return Column(
       children: [
-        GestureDetector(
-          onTap: () => context.push('/transactions/detail', extra: data),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Color(data.color).withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(data.emoji, style: const TextStyle(fontSize: 20)),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: amountColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    data.isExpense
+                        ? Icons.arrow_downward_rounded
+                        : Icons.arrow_upward_rounded,
+                    size: 20,
+                    color: amountColor,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data.name,
-                        style: AppTextStyles.body(t.txtPrimary).copyWith(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.description,
+                      style: AppTextStyles.body(t.txtPrimary).copyWith(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        data.subtitle,
-                        style: AppTextStyles.bodySm(t.txtTertiary),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.bodySm(t.txtTertiary),
+                    ),
+                  ],
                 ),
-                Text(
-                  amountStr,
-                  style: AppTextStyles.body(amountColor).copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
+              ),
+              Text(
+                amountStr,
+                style: AppTextStyles.body(amountColor).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         if (showDivider)

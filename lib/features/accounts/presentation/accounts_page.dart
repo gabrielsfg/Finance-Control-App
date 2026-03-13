@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -6,85 +8,17 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
-
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kNetWorth = 1284350; // R$ 12.843,50
-
-const _kAccounts = [
-  _AccountData(
-    id: 1,
-    name: 'Nubank',
-    type: 'Checking',
-    balanceCents: 384752,
-    isDefault: true,
-    excludeFromNetWorth: false,
-    color: Color(0xFF8B5CF6),
-    icon: LucideIcons.creditCard,
-  ),
-  _AccountData(
-    id: 2,
-    name: 'Itaú',
-    type: 'Savings',
-    balanceCents: 750000,
-    isDefault: false,
-    excludeFromNetWorth: false,
-    color: Color(0xFFF59E0B),
-    icon: LucideIcons.building2,
-  ),
-  _AccountData(
-    id: 3,
-    name: 'XP Investimentos',
-    type: 'Investment',
-    balanceCents: 149598,
-    isDefault: false,
-    excludeFromNetWorth: false,
-    color: Color(0xFF06B6D4),
-    icon: LucideIcons.trendingUp,
-  ),
-  _AccountData(
-    id: 4,
-    name: 'Emergency Fund',
-    type: 'Savings',
-    balanceCents: 200000,
-    isDefault: false,
-    excludeFromNetWorth: true,
-    color: Color(0xFF22C55E),
-    icon: LucideIcons.shieldCheck,
-  ),
-];
-
-// ── Model ──────────────────────────────────────────────────────────────────
-
-class _AccountData {
-  final int id;
-  final String name;
-  final String type;
-  final int balanceCents;
-  final bool isDefault;
-  final bool excludeFromNetWorth;
-  final Color color;
-  final IconData icon;
-
-  const _AccountData({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.balanceCents,
-    required this.isDefault,
-    required this.excludeFromNetWorth,
-    required this.color,
-    required this.icon,
-  });
-}
+import '../data/models/account.dart';
+import '../providers/accounts_provider.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-class AccountsPage extends StatelessWidget {
+class AccountsPage extends ConsumerWidget {
   const AccountsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountsAsync = ref.watch(accountsNotifierProvider);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
 
     return AppBackground(
@@ -99,9 +33,39 @@ class AccountsPage extends StatelessWidget {
               const SizedBox(height: 8),
               const _Header(),
               const SizedBox(height: 20),
-              const _NetWorthCard(),
+              accountsAsync.when(
+                loading: () => const _NetWorthCard(
+                  netWorthCents: 0,
+                  includedCount: 0,
+                  excludedCount: 0,
+                  totalCount: 0,
+                ),
+                error: (_, s) => const _NetWorthCard(
+                  netWorthCents: 0,
+                  includedCount: 0,
+                  excludedCount: 0,
+                  totalCount: 0,
+                ),
+                data: (accounts) {
+                  final netWorth = accounts
+                      .fold(0, (sum, a) => sum + a.balanceCents);
+                  return _NetWorthCard(
+                    netWorthCents: netWorth,
+                    includedCount: accounts.length,
+                    excludedCount: 0,
+                    totalCount: accounts.length,
+                  );
+                },
+              ),
               const SizedBox(height: 24),
-              const _AccountsSection(),
+              accountsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _ErrorView(
+                  onRetry: () =>
+                      ref.read(accountsNotifierProvider.notifier).refresh(),
+                ),
+                data: (accounts) => _AccountsSection(accounts: accounts),
+              ),
               SizedBox(height: bottomPad + 76 + 24),
             ],
           ),
@@ -122,8 +86,16 @@ class _Header extends StatelessWidget {
 
     return Row(
       children: [
+        const SizedBox(width: 36),
         Expanded(
-          child: Text('Accounts', style: AppTextStyles.h1(t.txtPrimary)),
+          child: Text(
+            'Accounts',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body(t.txtPrimary).copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+            ),
+          ),
         ),
         const ThemeToggleButton(),
         const SizedBox(width: 10),
@@ -137,9 +109,7 @@ class _AddAccountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        // TODO: navigate to add account page
-      },
+      onTap: () => context.push('/accounts/create'),
       child: Container(
         width: 36,
         height: 36,
@@ -157,16 +127,21 @@ class _AddAccountButton extends StatelessWidget {
 // ── Net Worth Card ─────────────────────────────────────────────────────────
 
 class _NetWorthCard extends StatelessWidget {
-  const _NetWorthCard();
+  final int netWorthCents;
+  final int includedCount;
+  final int excludedCount;
+  final int totalCount;
+
+  const _NetWorthCard({
+    required this.netWorthCents,
+    required this.includedCount,
+    required this.excludedCount,
+    required this.totalCount,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-
-    final includedCount =
-        _kAccounts.where((a) => !a.excludeFromNetWorth).length;
-    final excludedCount =
-        _kAccounts.where((a) => a.excludeFromNetWorth).length;
 
     return GlassCard(
       child: Column(
@@ -183,7 +158,7 @@ class _NetWorthCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            formatCurrency(_kNetWorth),
+            formatCurrency(netWorthCents),
             textAlign: TextAlign.center,
             style: AppTextStyles.moneyLg(t.txtPrimary).copyWith(fontSize: 34),
           ),
@@ -220,7 +195,7 @@ class _NetWorthCard extends StatelessWidget {
               ),
               _NetWorthStat(
                 label: 'Total',
-                count: _kAccounts.length,
+                count: totalCount,
                 icon: LucideIcons.wallet,
                 color: t.primary,
               ),
@@ -271,7 +246,9 @@ class _NetWorthStat extends StatelessWidget {
 // ── Accounts Section ───────────────────────────────────────────────────────
 
 class _AccountsSection extends StatelessWidget {
-  const _AccountsSection();
+  final List<Account> accounts;
+
+  const _AccountsSection({required this.accounts});
 
   @override
   Widget build(BuildContext context) {
@@ -285,33 +262,33 @@ class _AccountsSection extends StatelessWidget {
             Text('My Accounts', style: AppTextStyles.h3(t.txtPrimary)),
             const Spacer(),
             Text(
-              '${_kAccounts.length} accounts',
+              '${accounts.length} accounts',
               style: AppTextStyles.bodySm(t.txtTertiary),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        ..._kAccounts.map((account) => _AccountCard(data: account)),
+        ...accounts.map((account) => _AccountCard(account: account)),
       ],
     );
   }
 }
 
-class _AccountCard extends StatelessWidget {
-  final _AccountData data;
+// ── Account Card ───────────────────────────────────────────────────────────
 
-  const _AccountCard({required this.data});
+class _AccountCard extends StatelessWidget {
+  final Account account;
+
+  const _AccountCard({required this.account});
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
-    final isNegative = data.balanceCents < 0;
+    final isNegative = account.balanceCents < 0;
     final balanceColor = isNegative ? t.error : t.txtPrimary;
 
     return GestureDetector(
-      onTap: () {
-        // TODO: navigate to account detail / edit
-      },
+      onTap: () => context.push('/accounts/${account.id}/edit'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -333,10 +310,10 @@ class _AccountCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: data.color.withValues(alpha: 0.15),
+                color: t.primary.withValues(alpha: 0.15),
                 borderRadius: AppRadius.lgAll,
               ),
-              child: Icon(data.icon, color: data.color, size: 22),
+              child: Icon(LucideIcons.wallet, color: t.primary, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -347,7 +324,7 @@ class _AccountCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          data.name,
+                          account.name,
                           style: AppTextStyles.body(t.txtPrimary).copyWith(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
@@ -355,22 +332,9 @@ class _AccountCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (data.isDefault) ...[
+                      if (account.isDefault) ...[
                         const SizedBox(width: 6),
                         _Badge(label: 'Default', color: t.primary),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Text(
-                        data.type,
-                        style: AppTextStyles.bodySm(t.txtTertiary),
-                      ),
-                      if (data.excludeFromNetWorth) ...[
-                        const SizedBox(width: 6),
-                        _Badge(label: 'Excluded', color: t.txtTertiary),
                       ],
                     ],
                   ),
@@ -382,7 +346,7 @@ class _AccountCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  formatCurrency(data.balanceCents),
+                  formatCurrency(account.balanceCents),
                   style: AppTextStyles.moneyMd(balanceColor)
                       .copyWith(fontSize: 15),
                 ),
@@ -426,6 +390,34 @@ class _Badge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: color,
         ),
+      ),
+    );
+  }
+}
+
+// ── Error View ─────────────────────────────────────────────────────────────
+
+class _ErrorView extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    return Center(
+      child: Column(
+        children: [
+          Icon(LucideIcons.alertCircle, color: t.error, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            'Failed to load accounts',
+            style: AppTextStyles.body(t.txtSecondary),
+          ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,121 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/transaction_item.dart';
-
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kIncome  = 520000; // R$ 5.200,00
-const _kExpense = 135248; // R$ 1.352,48
-const _kBalance = 384752; // R$ 3.847,52
-
-final _kGroups = [
-  TransactionGroup(
-    date: DateTime(2026, 2, 19),
-    items: [
-      TransactionItem(
-        name: 'Breakfast',
-        subtitle: 'Food · Café',
-        amountCents: -1200,
-        emoji: '☕',
-        color: 0xFFF59E0B,
-        date: DateTime(2026, 2, 19),
-        category: 'Food',
-        subcategory: 'Café',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Uber to work',
-        subtitle: 'Transport · Ride',
-        amountCents: -1890,
-        emoji: '🚗',
-        color: 0xFF06B6D4,
-        date: DateTime(2026, 2, 19),
-        category: 'Transport',
-        subcategory: 'Ride',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 18),
-    items: [
-      TransactionItem(
-        name: 'iFood',
-        subtitle: 'Food · Delivery',
-        amountCents: -6790,
-        emoji: '🍔',
-        color: 0xFFEF4444,
-        date: DateTime(2026, 2, 18),
-        category: 'Food',
-        subcategory: 'Delivery',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Salary',
-        subtitle: 'Income · Work',
-        amountCents: 520000,
-        emoji: '💼',
-        color: 0xFF22C55E,
-        date: DateTime(2026, 2, 18),
-        category: 'Income',
-        subcategory: 'Salary',
-        account: 'Nubank',
-        type: 'Income',
-        recurrence: 'Monthly',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 15),
-    items: [
-      TransactionItem(
-        name: 'Rent',
-        subtitle: 'Housing · Rent',
-        amountCents: -180000,
-        emoji: '🏠',
-        color: 0xFF8B5CF6,
-        date: DateTime(2026, 2, 15),
-        category: 'Housing',
-        subcategory: 'Rent',
-        account: 'Nubank',
-        type: 'Expense',
-        recurrence: 'Monthly',
-      ),
-    ],
-  ),
-  TransactionGroup(
-    date: DateTime(2026, 2, 14),
-    items: [
-      TransactionItem(
-        name: 'Pharmacy',
-        subtitle: 'Health · Medicine',
-        amountCents: -4580,
-        emoji: '💊',
-        color: 0xFFEF4444,
-        date: DateTime(2026, 2, 14),
-        category: 'Health',
-        subcategory: 'Medicine',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-      TransactionItem(
-        name: 'Uber',
-        subtitle: 'Transport · Ride',
-        amountCents: -3240,
-        emoji: '🚗',
-        color: 0xFF06B6D4,
-        date: DateTime(2026, 2, 14),
-        category: 'Transport',
-        subcategory: 'Ride',
-        account: 'Nubank',
-        type: 'Expense',
-      ),
-    ],
-  ),
-];
+import '../providers/transaction_provider.dart';
 
 // ── Filter enum ────────────────────────────────────────────────────────────
 
@@ -129,16 +16,16 @@ enum _TransactionFilter { all, expenses, income, recurring }
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-class TransactionsPage extends StatefulWidget {
+class TransactionsPage extends ConsumerStatefulWidget {
   const TransactionsPage({super.key});
 
   @override
-  State<TransactionsPage> createState() => _TransactionsPageState();
+  ConsumerState<TransactionsPage> createState() => _TransactionsPageState();
 }
 
-class _TransactionsPageState extends State<TransactionsPage> {
+class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   _TransactionFilter _filter = _TransactionFilter.all;
-  DateTime _selectedMonth = DateTime(2026, 2);
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   void _previousMonth() {
     setState(() {
@@ -152,67 +39,122 @@ class _TransactionsPageState extends State<TransactionsPage> {
     });
   }
 
-  List<TransactionGroup> get _filteredGroups {
-    if (_filter == _TransactionFilter.all) return _kGroups;
+  List<TransactionItem> _applyFilters(List<TransactionItem> all) {
+    // Filter by selected month
+    var filtered = all.where((t) {
+      return t.date.year == _selectedMonth.year &&
+          t.date.month == _selectedMonth.month;
+    }).toList();
 
-    return _kGroups
-        .map((group) {
-          final filtered = group.items.where((item) {
-            switch (_filter) {
-              case _TransactionFilter.expenses:
-                return item.amountCents < 0;
-              case _TransactionFilter.income:
-                return item.amountCents > 0;
-              case _TransactionFilter.recurring:
-                // TODO: filter by recurring flag when API is connected
-                return false;
-              case _TransactionFilter.all:
-                return true;
-            }
-          }).toList();
-          return TransactionGroup(date: group.date, items: filtered);
-        })
-        .where((g) => g.items.isNotEmpty)
-        .toList();
+    // Filter by type/recurrence
+    filtered = switch (_filter) {
+      _TransactionFilter.expenses =>
+        filtered.where((t) => t.type == 'Expense').toList(),
+      _TransactionFilter.income =>
+        filtered.where((t) => t.type == 'Income').toList(),
+      _TransactionFilter.recurring =>
+        filtered.where((t) => t.paymentType == 'Recurring').toList(),
+      _TransactionFilter.all => filtered,
+    };
+
+    // Sort newest first
+    filtered.sort((a, b) => b.date.compareTo(a.date));
+    return filtered;
+  }
+
+  List<TransactionGroup> _groupByDate(List<TransactionItem> items) {
+    final map = <DateTime, List<TransactionItem>>{};
+    for (final item in items) {
+      final day = DateTime(item.date.year, item.date.month, item.date.day);
+      map.putIfAbsent(day, () => []).add(item);
+    }
+    final keys = map.keys.toList()..sort((a, b) => b.compareTo(a));
+    return keys.map((d) => TransactionGroup(date: d, items: map[d]!)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final asyncTx = ref.watch(transactionsNotifierProvider);
 
     return AppBackground(
-      scrollable: true,
+      scrollable: false,
       child: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: AppSpacing.screenPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              const _SummaryHeader(
-                income: _kIncome,
-                expense: _kExpense,
-                balance: _kBalance,
-              ),
-              const SizedBox(height: 16),
-              _FilterChips(
-                selected: _filter,
-                onChanged: (f) => setState(() => _filter = f),
-              ),
-              const SizedBox(height: 16),
-              _MonthNavigator(
-                month: _selectedMonth,
-                onPrevious: _previousMonth,
-                onNext: _nextMonth,
-              ),
-              const SizedBox(height: 8),
-              ..._filteredGroups.map(
-                (group) => _TransactionGroupSection(group: group),
-              ),
-              SizedBox(height: bottomPad + 76 + 24),
-            ],
-          ),
+        child: asyncTx.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+          data: (allTransactions) {
+            final filtered = _applyFilters(allTransactions);
+            final groups = _groupByDate(filtered);
+
+            final income = filtered
+                .where((t) => t.amountCents > 0)
+                .fold(0, (sum, t) => sum + t.amountCents);
+            final expense = filtered
+                .where((t) => t.amountCents < 0)
+                .fold(0, (sum, t) => sum + t.amountCents.abs());
+            final balance = income - expense;
+
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: AppSpacing.screenPadding.copyWith(bottom: 0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      const SizedBox(height: 8),
+                      _SummaryHeader(
+                        income: income,
+                        expense: expense,
+                        balance: balance,
+                      ),
+                      const SizedBox(height: 16),
+                      _FilterChips(
+                        selected: _filter,
+                        onChanged: (f) => setState(() => _filter = f),
+                      ),
+                      const SizedBox(height: 16),
+                      _MonthNavigator(
+                        month: _selectedMonth,
+                        onPrevious: _previousMonth,
+                        onNext: _nextMonth,
+                      ),
+                      const SizedBox(height: 8),
+                    ]),
+                  ),
+                ),
+                if (groups.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        child: Text(
+                          'No transactions this month',
+                          style: AppTextStyles.body(
+                            AppThemeTokens.of(context).txtTertiary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: AppSpacing.screenPadding.copyWith(
+                      top: 0,
+                      bottom: bottomPad + 76 + 24,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) =>
+                            _TransactionGroupSection(group: groups[index]),
+                        childCount: groups.length,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -529,11 +471,17 @@ class _TransactionRow extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Color(item.color).withValues(alpha: 0.15),
+                    color: (isExpense ? t.error : t.success).withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text(item.emoji, style: const TextStyle(fontSize: 20)),
+                    child: Icon(
+                      isExpense
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_downward_rounded,
+                      size: 20,
+                      color: isExpense ? t.error : t.success,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -542,7 +490,7 @@ class _TransactionRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item.name,
+                        item.subCategoryName,
                         style: AppTextStyles.body(t.txtPrimary).copyWith(
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
@@ -550,7 +498,7 @@ class _TransactionRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.subtitle,
+                        item.accountName,
                         style: AppTextStyles.bodySm(t.txtTertiary)
                             .copyWith(fontSize: 12),
                       ),

@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_widgets.dart';
-
-// ── Mock data (TODO: replace with Riverpod providers) ─────────────────────
-
-const _kUserName = 'Gabriel Ferreira';
-const _kUserEmail = 'gabriel@example.com';
-const _kUserInitials = 'GF';
-const _kMemberSince = 'Member since February 2026';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -87,24 +81,24 @@ class _ProfileCard extends StatelessWidget {
     return GlassCard(
       child: Row(
         children: [
-          const AppAvatar(initials: _kUserInitials, size: 56),
+          const AppAvatar(initials: '?', size: 56),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _kUserName,
+                  '—',
                   style: AppTextStyles.h3(t.txtPrimary),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _kUserEmail,
+                  '—',
                   style: AppTextStyles.bodySm(t.txtTertiary),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _kMemberSince,
+                  '',
                   style: AppTextStyles.caption(t.txtDisabled),
                 ),
               ],
@@ -349,6 +343,13 @@ class _AccountSection extends StatelessWidget {
         const _SectionHeader(title: 'Account'),
         _SettingsCard(
           items: [
+            _SettingRow(
+              icon: LucideIcons.tag,
+              iconColor: const Color(0xFF8B5CF6),
+              label: 'Categorias',
+              subtitle: 'Gerencie suas categorias',
+              onTap: () => context.push('/categories'),
+            ),
             _SettingRow(
               icon: LucideIcons.user,
               iconColor: t.primary,

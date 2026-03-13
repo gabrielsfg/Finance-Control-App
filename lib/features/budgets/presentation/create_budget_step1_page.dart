@@ -14,7 +14,7 @@ final _kRecurrenceOptions = [
   ('Monthly', '📅'),
   ('Weekly', '📆'),
   ('Biweekly', '🗓️'),
-  ('Quarterly', '📊'),
+  ('Semiannually', '📊'),
   ('Annually', '🗒️'),
 ];
 
@@ -32,6 +32,7 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
     text: CreateBudgetState.instance.name,
   );
   String _recurrence = CreateBudgetState.instance.recurrence;
+  int _startDay = CreateBudgetState.instance.startDay;
 
   @override
   void dispose() {
@@ -45,7 +46,8 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
     if (!_canProceed) return;
     CreateBudgetState.instance
       ..name = _nameController.text.trim()
-      ..recurrence = _recurrence;
+      ..recurrence = _recurrence
+      ..startDay = _startDay;
     context.push('/budgets/create/step2');
   }
 
@@ -150,12 +152,23 @@ class _CreateBudgetStep1PageState extends State<CreateBudgetStep1Page> {
                           onTap: () => setState(() => _recurrence = label),
                         );
                       }),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Start day of month',
+                        style: AppTextStyles.caption(t.txtSecondary).copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _StartDayDropdown(
+                        value: _startDay,
+                        onChanged: (day) => setState(() => _startDay = day),
+                      ),
                     ],
                   ),
                 ),
               ),
-
-              // ── Next button ────────────────────────────────────────────
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPad + 20),
                 child: PrimaryButton(
@@ -236,6 +249,58 @@ class _RecurrenceTile extends StatelessWidget {
             if (selected)
               Text('✓', style: TextStyle(fontSize: 18, color: t.primary, fontWeight: FontWeight.w700)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Start Day Dropdown ────────────────────────────────────────────────────────
+
+class _StartDayDropdown extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _StartDayDropdown({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: t.isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.7),
+        borderRadius: AppRadius.baseAll,
+        border: Border.all(
+          color: t.isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : t.primary.withValues(alpha: 0.12),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          isExpanded: true,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          borderRadius: AppRadius.baseAll,
+          dropdownColor: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          icon: Text('▾', style: TextStyle(fontSize: 18, color: t.txtTertiary, height: 1)),
+          style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 14),
+          items: List.generate(31, (i) {
+            final day = i + 1;
+            return DropdownMenuItem(
+              value: day,
+              child: Text(
+                'Day $day',
+                style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 14),
+              ),
+            );
+          }),
+          onChanged: (day) {
+            if (day != null) onChanged(day);
+          },
         ),
       ),
     );
