@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,8 +77,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         accessToken: token,
         refreshToken: '',
       );
-    } catch (e) {
-      setState(() => _globalError = 'E-mail ou senha incorretos.');
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final message = (status == 401 || status == 400)
+          ? 'E-mail ou senha incorretos.'
+          : 'Erro de servidor. Tente novamente.';
+      setState(() => _globalError = message);
+    } catch (_) {
+      setState(() => _globalError = 'Erro inesperado. Tente novamente.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

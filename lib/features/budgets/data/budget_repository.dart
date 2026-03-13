@@ -21,7 +21,7 @@ class BudgetRepository {
   // ── Budget CRUD ────────────────────────────────────────────────────────────
 
   Future<List<GetAllBudgetResponseDto>> getAllBudgets() async {
-    final response = await _dio.get(ApiEndpoints.allBudgets);
+    final response = await _dio.get(ApiEndpoints.budgets);
     return (response.data as List)
         .map((e) => GetAllBudgetResponseDto.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -53,7 +53,7 @@ class BudgetRepository {
   Future<GetBudgetByIdResponseDto> updateBudget(
       UpdateBudgetRequestDto dto) async {
     final response = await _dio.patch(
-      ApiEndpoints.budgets,
+      ApiEndpoints.budgetById(dto.id),
       data: dto.toJson(),
     );
     return GetBudgetByIdResponseDto.fromJson(

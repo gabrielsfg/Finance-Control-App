@@ -38,19 +38,18 @@ abstract class ApiEndpoints {
 
   // Subcategories
   static const String subcategories = '/api/SubCategory';
-  static const String allSubcategories = '/api/SubCategory/all';
-  static String subcategoryById(int id) => '/api/SubCategory/by-id/$id';
+  static String subcategoryById(int id) => '/api/SubCategory/$id';
   static String deleteSubcategory(int id) => '/api/SubCategory/$id';
 
   // Budgets
   static const String budgets = '/api/budget';
-  static const String allBudgets = '/api/budget/all';
-  static String budgetById(int id) => '/api/budget/by-id/$id';
+  static String budgetById(int id) => '/api/budget/$id';
   static String budgetWithAllocations(int id) => '/api/budget/$id/allocation';
 
   // Budget Areas
   static const String budgetAreas = '/api/area';
-  static String budgetAreasByBudget(int budgetId) => '/api/area/all/$budgetId';
+  static String areaById(int id) => '/api/area/$id';
+  static String budgetAreasByBudget(int budgetId) => '/api/area?budgetId=$budgetId';
 
   // Budget Allocations
   static String budgetAllocations(int budgetId) =>
