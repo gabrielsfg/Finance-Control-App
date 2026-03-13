@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,19 +8,35 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/transaction_item.dart';
+import '../providers/transaction_provider.dart';
 
-class TransactionDetailPage extends StatelessWidget {
+class TransactionDetailPage extends ConsumerWidget {
   final TransactionItem transaction;
 
   const TransactionDetailPage({super.key, required this.transaction});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppThemeTokens.of(context);
+    final actionState = ref.watch(transactionActionProvider);
     final isExpense = transaction.amountCents < 0;
     final amountColor = isExpense ? t.error : t.success;
     final sign = isExpense ? '- ' : '+ ';
     final amountStr = '$sign${formatCurrency(transaction.amountCents.abs())}';
+
+    ref.listen(transactionActionProvider, (_, next) {
+      if (next is TransactionActionSuccess) {
+        ref.read(transactionActionProvider.notifier).reset();
+        context.pop();
+      } else if (next is TransactionActionError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.message)),
+        );
+        ref.read(transactionActionProvider.notifier).reset();
+      }
+    });
+
+    final isLoading = actionState is TransactionActionLoading;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -61,15 +78,15 @@ class TransactionDetailPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 36), // balance the back button
+                    const SizedBox(width: 36),
                   ],
                 ),
               ),
 
               Expanded(
                 child: SingleChildScrollView(
-                  padding: AppSpacing.screenPadding
-                      .copyWith(top: 20, bottom: 24),
+                  padding:
+                      AppSpacing.screenPadding.copyWith(top: 20, bottom: 24),
                   child: Column(
                     children: [
                       // ── Hero card ──────────────────────────────────────
@@ -80,14 +97,16 @@ class TransactionDetailPage extends StatelessWidget {
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
-                                color: Color(transaction.color)
-                                    .withValues(alpha: 0.18),
+                                color: amountColor.withValues(alpha: 0.18),
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
-                                child: Text(
-                                  transaction.emoji,
-                                  style: const TextStyle(fontSize: 28),
+                                child: Icon(
+                                  isExpense
+                                      ? Icons.arrow_upward_rounded
+                                      : Icons.arrow_downward_rounded,
+                                  size: 28,
+                                  color: amountColor,
                                 ),
                               ),
                             ),
@@ -99,7 +118,7 @@ class TransactionDetailPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              transaction.name,
+                              transaction.subCategoryName,
                               style: AppTextStyles.body(t.txtPrimary).copyWith(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
@@ -118,16 +137,12 @@ class TransactionDetailPage extends StatelessWidget {
                         child: Column(
                           children: [
                             _DetailRow(
-                              label: 'Category',
-                              value: transaction.category,
-                            ),
-                            _DetailRow(
                               label: 'Subcategory',
-                              value: transaction.subcategory,
+                              value: transaction.subCategoryName,
                             ),
                             _DetailRow(
                               label: 'Account',
-                              value: transaction.account,
+                              value: transaction.accountName,
                             ),
                             _DetailRow(
                               label: 'Date',
@@ -139,14 +154,30 @@ class TransactionDetailPage extends StatelessWidget {
                               valueColor: amountColor,
                             ),
                             _DetailRow(
-                              label: 'Recurrence',
-                              value: transaction.recurrence == 'None'
-                                  ? 'No'
-                                  : transaction.recurrence,
+                              label: 'Payment',
+                              value: transaction.paymentType,
                             ),
+                            if (transaction.paymentType == 'Recurring')
+                              _DetailRow(
+                                label: 'Recurring ID',
+                                value:
+                                    '#${transaction.recurringTransactionId}',
+                              ),
+                            if (transaction.paymentType == 'Installment' &&
+                                transaction.installmentNumber != null)
+                              _DetailRow(
+                                label: 'Installment',
+                                value:
+                                    '${transaction.installmentNumber}/${transaction.totalInstallments}',
+                              ),
+                            if (transaction.budgetId != null)
+                              _DetailRow(
+                                label: 'Budget',
+                                value: '#${transaction.budgetId}',
+                              ),
                             _DetailRow(
-                              label: 'Installments',
-                              value: '${transaction.installments}x',
+                              label: 'Status',
+                              value: transaction.isPaid ? 'Paid' : 'Pending',
                               showDivider: transaction.description != null,
                             ),
                             if (transaction.description != null)
@@ -177,19 +208,47 @@ class TransactionDetailPage extends StatelessWidget {
                       child: AppOutlineButton(
                         label: 'Delete',
                         danger: true,
-                        onPressed: () {
-                          // TODO: call delete endpoint
-                          context.pop();
-                        },
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text('Delete transaction'),
+                                    content: const Text(
+                                        'Are you sure? This action cannot be undone.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true && context.mounted) {
+                                  ref
+                                      .read(transactionActionProvider.notifier)
+                                      .delete(transaction.id);
+                                }
+                              },
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: PrimaryButton(
-                        label: 'Edit',
-                        onPressed: () {
-                          // TODO: navigate to edit screen
-                        },
+                        label: isLoading ? 'Loading...' : 'Edit',
+                        onPressed: isLoading
+                            ? null
+                            : () => context.push(
+                                  '/transactions/edit',
+                                  extra: transaction,
+                                ),
                       ),
                     ),
                   ],

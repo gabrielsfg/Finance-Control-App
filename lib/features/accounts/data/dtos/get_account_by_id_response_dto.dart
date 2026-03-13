@@ -42,7 +42,7 @@ class RecentTransactionDto {
   final int id;
   final String? description;
   final int value;
-  final int type;
+  final String type;
   final String subCategoryName;
   final String categoryName;
 

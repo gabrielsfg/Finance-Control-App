@@ -13,13 +13,17 @@ import '../../features/profile/presentation/profile_page.dart';
 import '../../features/auth/presentation/register_page.dart';
 import '../../features/auth/presentation/splash_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/budgets/data/models/budget_models.dart';
 import '../../features/budgets/presentation/budgets_page.dart';
 import '../../features/budgets/presentation/create_budget_step1_page.dart';
+import '../../features/budgets/presentation/edit_budget_page.dart';
 import '../../features/budgets/presentation/create_budget_step2_page.dart';
 import '../../features/budgets/presentation/create_budget_step3_page.dart';
+import '../../features/budgets/presentation/create_budget_step4_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/transactions/data/models/transaction_item.dart';
 import '../../features/transactions/presentation/add_transaction_page.dart';
+import '../../features/transactions/presentation/edit_transaction_page.dart';
 import '../../features/transactions/presentation/transaction_detail_page.dart';
 import '../../features/transactions/presentation/transactions_page.dart';
 import '../../shared/widgets/app_shell.dart';
@@ -63,6 +67,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const AddTransactionPage(),
       ),
       GoRoute(
+        path: '/transactions/edit',
+        builder: (_, state) {
+          final transaction = state.extra as TransactionItem;
+          return EditTransactionPage(transaction: transaction);
+        },
+      ),
+      GoRoute(
         path: '/accounts/create',
         builder: (_, _) => const CreateAccountPage(),
       ),
@@ -87,6 +98,29 @@ final routerProvider = Provider<GoRouter>((ref) {
           return EditAccountPage(accountId: id);
         },
       ),
+      GoRoute(
+        path: '/budgets/edit',
+        builder: (_, state) {
+          final budget = state.extra as Budget;
+          return EditBudgetPage(budget: budget);
+        },
+      ),
+      GoRoute(
+        path: '/budgets/create/step1',
+        builder: (_, _) => const CreateBudgetStep1Page(),
+      ),
+      GoRoute(
+        path: '/budgets/create/step2',
+        builder: (_, _) => const CreateBudgetStep2Page(),
+      ),
+      GoRoute(
+        path: '/budgets/create/step3',
+        builder: (_, _) => const CreateBudgetStep3Page(),
+      ),
+      GoRoute(
+        path: '/budgets/create/step4',
+        builder: (_, _) => const CreateBudgetStep4Page(),
+      ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),
         routes: [
@@ -110,20 +144,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/budgets',
             builder: (_, _) => const BudgetsPage(),
-            routes: [
-              GoRoute(
-                path: 'create/step1',
-                builder: (_, _) => const CreateBudgetStep1Page(),
-              ),
-              GoRoute(
-                path: 'create/step2',
-                builder: (_, _) => const CreateBudgetStep2Page(),
-              ),
-              GoRoute(
-                path: 'create/step3',
-                builder: (_, _) => const CreateBudgetStep3Page(),
-              ),
-            ],
           ),
           GoRoute(
             path: '/accounts',

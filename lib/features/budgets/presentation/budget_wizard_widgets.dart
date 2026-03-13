@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// Step indicator shared across the 3 budget creation steps.
+/// Step indicator shared across the 4 budget creation steps.
 class BudgetStepIndicator extends StatelessWidget {
   final int current; // 1-based
 
@@ -14,7 +14,7 @@ class BudgetStepIndicator extends StatelessWidget {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (i) {
+      children: List.generate(4, (i) {
         final step = i + 1;
         final isDone = step < current;
         final isActive = step == current;

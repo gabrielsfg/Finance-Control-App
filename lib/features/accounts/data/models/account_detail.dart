@@ -13,11 +13,11 @@ class RecentTransaction {
   final int id;
   final String? description;
   final int valueCents;
-  final int type;
+  final String type;
   final String subCategoryName;
   final String categoryName;
 
-  bool get isExpense => type == 0;
+  bool get isExpense => type == 'Expense';
 
   factory RecentTransaction.fromDto(RecentTransactionDto dto) =>
       RecentTransaction(

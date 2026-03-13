@@ -50,8 +50,7 @@ class RecentTransactionDto {
   final int id;
   final String description;
   final int value;
-  /// 0 = Expense, 1 = Income
-  final int type;
+  final String type;
   final String subCategoryName;
   final String categoryName;
 

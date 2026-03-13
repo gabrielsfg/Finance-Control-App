@@ -16,7 +16,7 @@ class SubcategoryRepository {
   final Dio _dio;
 
   Future<List<SubcategoryItemResponseDto>> getAll() async {
-    final response = await _dio.get(ApiEndpoints.allSubcategories);
+    final response = await _dio.get(ApiEndpoints.subcategories);
     return (response.data as List)
         .map((e) => SubcategoryItemResponseDto.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -38,7 +38,7 @@ class SubcategoryRepository {
     UpdateSubcategoryRequestDto requestDto,
   ) async {
     final response = await _dio.patch(
-      ApiEndpoints.subcategories,
+      ApiEndpoints.subcategoryById(requestDto.id),
       data: requestDto.toJson(),
     );
     return (response.data as List)

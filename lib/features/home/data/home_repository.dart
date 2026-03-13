@@ -47,7 +47,7 @@ class HomeRepository {
       totalExpenses: dto.balanceSummary.totalExpenses,
       balance: dto.balanceSummary.balance,
       recentTransactions: dto.recentTransactions.map((t) {
-        final isExpense = t.type == 0;
+        final isExpense = t.type == 'Expense';
         return RecentTransactionSummary(
           id: t.id,
           description: t.description,
