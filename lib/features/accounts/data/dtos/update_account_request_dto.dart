@@ -6,17 +6,21 @@ part 'update_account_request_dto.g.dart';
 class UpdateAccountRequestDto {
   const UpdateAccountRequestDto({
     required this.name,
-    required this.currentBalance,
+    required this.accountType,
     required this.isDefaultAccount,
     required this.isExcludedFromNetWorth,
     this.goalAmount,
+    this.billingDueDay,
+    this.creditLimit,
   });
 
   final String name;
-  final int currentBalance;
+  final String accountType;
   final bool isDefaultAccount;
   final bool isExcludedFromNetWorth;
   final int? goalAmount;
+  final int? billingDueDay;
+  final int? creditLimit;
 
   Map<String, dynamic> toJson() => _$UpdateAccountRequestDtoToJson(this);
 }

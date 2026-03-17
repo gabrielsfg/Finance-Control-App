@@ -11,6 +11,13 @@ import '../../../shared/widgets/app_widgets.dart';
 import '../data/models/account.dart';
 import '../providers/accounts_provider.dart';
 
+IconData _accountTypeIcon(AccountType type) => switch (type) {
+      AccountType.checking => LucideIcons.landmark,
+      AccountType.savings => LucideIcons.piggyBank,
+      AccountType.credit => LucideIcons.creditCard,
+      AccountType.cash => LucideIcons.banknote,
+    };
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 class AccountsPage extends ConsumerWidget {
@@ -316,7 +323,11 @@ class _AccountCard extends StatelessWidget {
                 color: t.primary.withValues(alpha: 0.15),
                 borderRadius: AppRadius.lgAll,
               ),
-              child: Icon(LucideIcons.wallet, color: t.primary, size: 22),
+              child: Icon(
+                _accountTypeIcon(account.accountType),
+                color: t.primary,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -340,6 +351,11 @@ class _AccountCard extends StatelessWidget {
                         _Badge(label: 'Default', color: t.primary),
                       ],
                     ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    account.accountType.label,
+                    style: AppTextStyles.caption(t.txtTertiary),
                   ),
                 ],
               ),

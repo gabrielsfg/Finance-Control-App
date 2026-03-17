@@ -10,6 +10,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/dtos/create_account_request_dto.dart';
+import '../data/models/account.dart';
 import '../providers/accounts_provider.dart';
 
 class CreateAccountPage extends ConsumerStatefulWidget {
@@ -21,21 +22,26 @@ class CreateAccountPage extends ConsumerStatefulWidget {
 
 class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
   final _nameController = TextEditingController();
-  final _balanceController = TextEditingController();
   final _goalController = TextEditingController();
+  final _creditLimitController = TextEditingController();
+  final _billingDueDayController = TextEditingController();
 
+  AccountType _accountType = AccountType.checking;
   bool _isDefault = true;
   bool _excludeFromNetWorth = false;
   bool _isLoading = false;
 
   String? _nameError;
+  String? _creditLimitError;
+  String? _billingDueDayError;
   String? _submitError;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _balanceController.dispose();
     _goalController.dispose();
+    _creditLimitController.dispose();
+    _billingDueDayController.dispose();
     super.dispose();
   }
 
@@ -45,11 +51,36 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
   }
 
   bool _validate() {
-    final nameErr = _nameController.text.trim().isEmpty
-        ? 'Account name is required'
-        : null;
-    setState(() => _nameError = nameErr);
-    return nameErr == null;
+    String? nameErr;
+    String? creditErr;
+    String? dayErr;
+
+    if (_nameController.text.trim().isEmpty) {
+      nameErr = 'Account name is required';
+    }
+
+    if (_accountType == AccountType.credit) {
+      final limit = _parseCents(_creditLimitController.text);
+      if (limit <= 0) creditErr = 'Enter a valid credit limit';
+
+      final dayText = _billingDueDayController.text.trim();
+      if (dayText.isEmpty) {
+        dayErr = 'Enter the billing due day';
+      } else {
+        final day = int.tryParse(dayText);
+        if (day == null || day < 1 || day > 31) {
+          dayErr = 'Day must be between 1 and 31';
+        }
+      }
+    }
+
+    setState(() {
+      _nameError = nameErr;
+      _creditLimitError = creditErr;
+      _billingDueDayError = dayErr;
+    });
+
+    return nameErr == null && creditErr == null && dayErr == null;
   }
 
   Future<void> _submit() async {
@@ -61,14 +92,21 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
     });
 
     try {
+      final isCredit = _accountType == AccountType.credit;
       final goalCents = _parseCents(_goalController.text);
       await ref.read(accountsNotifierProvider.notifier).createAccount(
             CreateAccountRequestDto(
               name: _nameController.text.trim(),
-              currentBalance: _parseCents(_balanceController.text),
+              accountType: _accountType.apiValue,
               isDefaultAccount: _isDefault,
               isExcludedFromNetWorth: _excludeFromNetWorth,
               goalAmount: goalCents > 0 ? goalCents : null,
+              creditLimit: isCredit
+                  ? _parseCents(_creditLimitController.text)
+                  : null,
+              billingDueDay: isCredit
+                  ? int.tryParse(_billingDueDayController.text.trim())
+                  : null,
             ),
           );
       if (mounted) context.pop();
@@ -84,6 +122,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+    final isCredit = _accountType == AccountType.credit;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -97,7 +136,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-                // ── Header ────────────────────────────────────────────────
+                // ── Header ──────────────────────────────────────────────────
                 Row(
                   children: [
                     GestureDetector(
@@ -122,10 +161,17 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // ── Balance input (full-width, grows with content) ────────
-                _BalanceInput(controller: _balanceController),
+                // ── Account type selector ────────────────────────────────────
+                _AccountTypeSelector(
+                  selected: _accountType,
+                  onChanged: (type) => setState(() {
+                    _accountType = type;
+                    _creditLimitError = null;
+                    _billingDueDayError = null;
+                  }),
+                ),
                 const SizedBox(height: 20),
-                // ── Fields ────────────────────────────────────────────────
+                // ── Account name ─────────────────────────────────────────────
                 AppInputField(
                   label: 'Account name',
                   placeholder: 'e.g. Nubank, Cash, Savings',
@@ -138,6 +184,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
                   },
                 ),
                 const SizedBox(height: 14),
+                // ── Goal ─────────────────────────────────────────────────────
                 AppInputField(
                   label: 'Goal (optional)',
                   placeholder: '0,00',
@@ -147,11 +194,53 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
                     FilteringTextInputFormatter.digitsOnly,
                     const CentsInputFormatter(),
                   ],
-                  textInputAction: TextInputAction.done,
+                  textInputAction:
+                      isCredit ? TextInputAction.next : TextInputAction.done,
                   leftIcon: const Icon(LucideIcons.target, size: 16),
                 ),
+                // ── Credit-only fields ────────────────────────────────────────
+                if (isCredit) ...[
+                  const SizedBox(height: 14),
+                  AppInputField(
+                    label: 'Credit limit',
+                    placeholder: '0,00',
+                    controller: _creditLimitController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      const CentsInputFormatter(),
+                    ],
+                    errorText: _creditLimitError,
+                    textInputAction: TextInputAction.next,
+                    leftIcon: const Icon(LucideIcons.creditCard, size: 16),
+                    onChanged: (_) {
+                      if (_creditLimitError != null) {
+                        setState(() => _creditLimitError = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  AppInputField(
+                    label: 'Billing due day',
+                    placeholder: 'e.g. 10',
+                    controller: _billingDueDayController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    errorText: _billingDueDayError,
+                    textInputAction: TextInputAction.done,
+                    leftIcon: const Icon(LucideIcons.calendarDays, size: 16),
+                    onChanged: (_) {
+                      if (_billingDueDayError != null) {
+                        setState(() => _billingDueDayError = null);
+                      }
+                    },
+                  ),
+                ],
                 const SizedBox(height: 20),
-                // ── Toggles ───────────────────────────────────────────────
+                // ── Toggles ───────────────────────────────────────────────────
                 GlassCard(
                   child: Column(
                     children: [
@@ -184,7 +273,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                // ── Save button ───────────────────────────────────────────
+                // ── Save button ───────────────────────────────────────────────
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : PrimaryButton(
@@ -201,82 +290,94 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
   }
 }
 
-// ── Balance Input ─────────────────────────────────────────────────────────────
+// ── Account Type Selector ──────────────────────────────────────────────────────
 
-class _BalanceInput extends StatelessWidget {
-  final TextEditingController controller;
+class _AccountTypeSelector extends StatelessWidget {
+  final AccountType selected;
+  final ValueChanged<AccountType> onChanged;
 
-  const _BalanceInput({required this.controller});
+  const _AccountTypeSelector({
+    required this.selected,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppThemeTokens.of(context);
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'CURRENT BALANCE',
-          style: AppTextStyles.caption(t.txtTertiary).copyWith(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
-          ),
+          'Account type',
+          style: AppTextStyles.caption(t.txtSecondary)
+              .copyWith(fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              'R\$',
-              style: AppTextStyles.mono(t.txtSecondary, fontSize: 26)
-                  .copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 6),
-            IntrinsicWidth(
-              child: TextField(
-                controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(
-                  signed: true,
-                  decimal: false,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[\d\-]')),
-                  const CentsInputFormatter(allowNegative: true),
-                ],
-                style: AppTextStyles.moneyLg(t.txtPrimary).copyWith(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -1,
-                ),
-                decoration: InputDecoration(
-                  hintText: '0,00',
-                  hintStyle: AppTextStyles.moneyLg(
-                    t.txtPrimary.withValues(alpha: 0.35),
-                  ).copyWith(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -1,
+          children: AccountType.values.map((type) {
+            final isSelected = selected == type;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(type),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  margin: EdgeInsets.only(
+                    right: type != AccountType.values.last ? 8 : 0,
                   ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? t.primary.withValues(alpha: 0.15)
+                        : t.surfaceEl.withValues(alpha: t.isDark ? 0.3 : 0.5),
+                    borderRadius: AppRadius.baseAll,
+                    border: Border.all(
+                      color: isSelected
+                          ? t.primary.withValues(alpha: 0.6)
+                          : t.divider.withValues(alpha: 0.4),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _typeIcon(type),
+                        size: 18,
+                        color: isSelected ? t.primary : t.txtTertiary,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        type.label,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.caption(
+                          isSelected ? t.primary : t.txtTertiary,
+                        ).copyWith(
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            );
+          }).toList(),
         ),
       ],
     );
   }
+
+  IconData _typeIcon(AccountType type) => switch (type) {
+        AccountType.checking => LucideIcons.landmark,
+        AccountType.savings => LucideIcons.piggyBank,
+        AccountType.credit => LucideIcons.creditCard,
+        AccountType.cash => LucideIcons.banknote,
+      };
 }
 
-// ── Toggle Row ────────────────────────────────────────────────────────────────
+// ── Toggle Row ─────────────────────────────────────────────────────────────────
 
 class _ToggleRow extends StatelessWidget {
   final String label;
