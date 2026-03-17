@@ -57,7 +57,7 @@ class AccountDetail {
         balanceCents: dto.currentAmount,
         initialBalanceCents: dto.initialAmount,
         isDefault: dto.isDefaultAccount,
-        excludeFromNetWorth: dto.excludeFromNetWorth,
+        excludeFromNetWorth: dto.isExcludedFromNetWorth,
         goalAmountCents: dto.goalAmount,
         recentTransactions: dto.recentTransactions
             .map(RecentTransaction.fromDto)

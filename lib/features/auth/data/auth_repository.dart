@@ -5,7 +5,6 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
 import 'dtos/login_request_dto.dart';
 import 'dtos/register_request_dto.dart';
-import 'dtos/register_response_dto.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(ref.read(apiClientProvider).dio),
@@ -27,13 +26,13 @@ class AuthRepository {
     return response.data as String;
   }
 
-  /// Cria uma nova conta e retorna o usuário criado.
+  /// Cria uma nova conta e retorna o JWT token.
   /// Lança [DioException] em caso de falha (ex: 400 e-mail já cadastrado).
-  Future<RegisterResponseDto> register(RegisterRequestDto dto) async {
+  Future<String> register(RegisterRequestDto dto) async {
     final response = await _dio.post(
       ApiEndpoints.register,
       data: dto.toJson(),
     );
-    return RegisterResponseDto.fromJson(response.data as Map<String, dynamic>);
+    return response.data as String;
   }
 }

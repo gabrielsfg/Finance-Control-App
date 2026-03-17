@@ -56,6 +56,7 @@ class _EditAccountPageState extends ConsumerState<EditAccountPage> {
     }
     _isDefault = detail.isDefault;
     _excludeFromNetWorth = detail.excludeFromNetWorth;
+
   }
 
   static String _formatCentsForInput(int cents) {
@@ -97,7 +98,7 @@ class _EditAccountPageState extends ConsumerState<EditAccountPage> {
               name: _nameController.text.trim(),
               currentBalance: _parseCents(_balanceController.text),
               isDefaultAccount: _isDefault,
-              excludeFromNetWorth: _excludeFromNetWorth,
+              isExcludedFromNetWorth: _excludeFromNetWorth,
               goalAmount: goalCents > 0 ? goalCents : null,
             ),
           );

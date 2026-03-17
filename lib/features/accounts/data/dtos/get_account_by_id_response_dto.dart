@@ -10,7 +10,7 @@ class GetAccountByIdResponseDto {
     required this.currentAmount,
     this.initialAmount,
     required this.isDefaultAccount,
-    this.excludeFromNetWorth = false,
+    this.isExcludedFromNetWorth = false,
     this.goalAmount,
     required this.recentTransactions,
   });
@@ -20,7 +20,7 @@ class GetAccountByIdResponseDto {
   final int currentAmount;
   final int? initialAmount;
   final bool isDefaultAccount;
-  final bool excludeFromNetWorth;
+  final bool isExcludedFromNetWorth;
   final int? goalAmount;
   final List<RecentTransactionDto> recentTransactions;
 

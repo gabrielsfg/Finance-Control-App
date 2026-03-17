@@ -9,12 +9,14 @@ class GetAccountItemResponseDto {
     required this.name,
     required this.currentAmount,
     required this.isDefaultAccount,
+    required this.isExcludedFromNetWorth,
   });
 
   final int id;
   final String name;
   final int currentAmount;
   final bool isDefaultAccount;
+  final bool isExcludedFromNetWorth;
 
   factory GetAccountItemResponseDto.fromJson(Map<String, dynamic> json) =>
       _$GetAccountItemResponseDtoFromJson(json);

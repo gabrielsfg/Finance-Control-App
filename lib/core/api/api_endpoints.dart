@@ -28,13 +28,9 @@ abstract class ApiEndpoints {
   static String cancelRecurringTransaction(int recurringId) =>
       '/api/transaction/$recurringId/recurring/cancel';
 
-  // Categories (transaction picker — includes system categories)
-  static const String categories = '/api/categories';
-
   // Categories (user-owned — CRUD)
   static const String userCategories = '/api/category';
   static String userCategoryById(int id) => '/api/category/$id';
-  static const String userCategoryUpdate = '/api/category';
 
   // Subcategories
   static const String subcategories = '/api/SubCategory';

@@ -47,12 +47,15 @@ class AccountsPage extends ConsumerWidget {
                   totalCount: 0,
                 ),
                 data: (accounts) {
-                  final netWorth = accounts
-                      .fold(0, (sum, a) => sum + a.balanceCents);
+                  final included = accounts
+                      .where((a) => !a.isExcludedFromNetWorth)
+                      .toList();
+                  final netWorth =
+                      included.fold(0, (sum, a) => sum + a.balanceCents);
                   return _NetWorthCard(
                     netWorthCents: netWorth,
-                    includedCount: accounts.length,
-                    excludedCount: 0,
+                    includedCount: included.length,
+                    excludedCount: accounts.length - included.length,
                     totalCount: accounts.length,
                   );
                 },

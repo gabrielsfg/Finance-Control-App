@@ -67,6 +67,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
               name: _nameController.text.trim(),
               currentBalance: _parseCents(_balanceController.text),
               isDefaultAccount: _isDefault,
+              isExcludedFromNetWorth: _excludeFromNetWorth,
               goalAmount: goalCents > 0 ? goalCents : null,
             ),
           );

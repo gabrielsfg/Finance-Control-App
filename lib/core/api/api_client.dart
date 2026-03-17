@@ -42,7 +42,8 @@ class ApiClient {
 
     _dio.interceptors.addAll([
       _AuthInterceptor(storage, onUnauthorized: onUnauthorized),
-      LogInterceptor(requestBody: true, responseBody: true),
+      if (AppConfig.allowBadCertificate)
+        LogInterceptor(requestBody: true, responseBody: true),
     ]);
   }
 
