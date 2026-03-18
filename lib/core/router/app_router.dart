@@ -8,7 +8,11 @@ import '../../features/accounts/presentation/edit_account_page.dart';
 import '../../features/categories/presentation/categories_page.dart';
 import '../../features/categories/presentation/create_category_page.dart';
 import '../../features/categories/presentation/edit_categories_page.dart';
+import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
+import '../../features/auth/presentation/reset_password_page.dart';
+import '../../features/auth/presentation/verify_email_page.dart';
+import '../../features/auth/presentation/edit_profile_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/auth/presentation/register_page.dart';
 import '../../features/auth/presentation/splash_page.dart';
@@ -43,7 +47,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthenticated = authState.valueOrNull?.isAuthenticated ?? false;
       final isOnAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
-          state.matchedLocation == '/splash';
+          state.matchedLocation == '/splash' ||
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation.startsWith('/reset-password') ||
+          state.matchedLocation.startsWith('/verify-email');
 
       if (!isAuthenticated && !isOnAuthRoute) return '/login';
       if (isAuthenticated && isOnAuthRoute) return '/';
@@ -61,6 +68,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (_, _) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, _) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (_, state) {
+          final token = state.uri.queryParameters['token'] ?? '';
+          return ResetPasswordPage(token: token);
+        },
+      ),
+      GoRoute(
+        path: '/verify-email',
+        builder: (_, state) {
+          final token = state.uri.queryParameters['token'] ?? '';
+          return VerifyEmailPage(token: token);
+        },
       ),
       GoRoute(
         path: '/transactions/add',
@@ -152,6 +177,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/profile',
             builder: (_, _) => const ProfilePage(),
+          ),
+          GoRoute(
+            path: '/profile/edit',
+            builder: (_, _) => const EditProfilePage(),
           ),
         ],
       ),

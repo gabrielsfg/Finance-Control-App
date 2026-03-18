@@ -67,15 +67,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      final token = await ref.read(authRepositoryProvider).login(
+      final response = await ref.read(authRepositoryProvider).login(
         LoginRequestDto(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         ),
       );
       await ref.read(authNotifierProvider.notifier).onLoginSuccess(
-        accessToken: token,
-        refreshToken: '',
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
       );
     } on DioException catch (e) {
       final status = e.response?.statusCode;
@@ -193,7 +193,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 10),
+
+                  // ── Forgot password link ───────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
+                      child: Text(
+                        'Esqueceu sua senha?',
+                        style: AppTextStyles.bodySm(t.primary).copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
 
                   // ── Submit button ──────────────────────────────────────────
                   _isLoading

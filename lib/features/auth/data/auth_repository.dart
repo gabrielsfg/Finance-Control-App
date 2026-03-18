@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
+import 'dtos/auth_response_dto.dart';
 import 'dtos/login_request_dto.dart';
 import 'dtos/register_request_dto.dart';
+import 'dtos/update_profile_request_dto.dart';
 import 'dtos/user_profile_response_dto.dart';
 import 'models/user_profile.dart';
 
@@ -17,31 +19,81 @@ class AuthRepository {
 
   final Dio _dio;
 
-  /// Autentica o usuário e retorna o token JWT.
-  /// Lança [DioException] em caso de falha (ex: 400 credenciais inválidas).
-  Future<String> login(LoginRequestDto dto) async {
+  Future<AuthResponseDto> login(LoginRequestDto dto) async {
     final response = await _dio.post(
       ApiEndpoints.login,
       data: dto.toJson(),
     );
-    // O backend retorna a string do token diretamente no body
-    return response.data as String;
+    return AuthResponseDto.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// Cria uma nova conta e retorna o JWT token.
-  /// Lança [DioException] em caso de falha (ex: 400 e-mail já cadastrado).
-  Future<String> register(RegisterRequestDto dto) async {
+  Future<AuthResponseDto> register(RegisterRequestDto dto) async {
     final response = await _dio.post(
       ApiEndpoints.register,
       data: dto.toJson(),
     );
-    return response.data as String;
+    return AuthResponseDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> logout(String refreshToken) async {
+    await _dio.post(
+      ApiEndpoints.logout,
+      data: {'refreshToken': refreshToken},
+    );
+  }
+
+  Future<void> forgotPassword(String email) async {
+    await _dio.post(
+      ApiEndpoints.forgotPassword,
+      data: {'email': email},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _dio.post(
+      ApiEndpoints.resetPassword,
+      data: {'token': token, 'newPassword': newPassword},
+    );
+  }
+
+  Future<void> verifyEmail(String token) async {
+    await _dio.post(
+      ApiEndpoints.verifyEmail,
+      data: {'token': token},
+    );
   }
 
   Future<UserProfile> getProfile() async {
     final response = await _dio.get(ApiEndpoints.userMe);
     return UserProfile.fromDto(
       UserProfileResponseDto.fromJson(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<UserProfile> updateProfile(UpdateProfileRequestDto dto) async {
+    final response = await _dio.patch(
+      ApiEndpoints.userMe,
+      data: dto.toJson(),
+    );
+    return UserProfile.fromDto(
+      UserProfileResponseDto.fromJson(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> deleteAccount(String password) async {
+    await _dio.delete(
+      ApiEndpoints.userMe,
+      data: {'password': password},
+    );
+  }
+
+  Future<void> resetData(String password) async {
+    await _dio.post(
+      ApiEndpoints.resetData,
+      data: {'password': password},
     );
   }
 }

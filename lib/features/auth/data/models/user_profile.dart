@@ -7,6 +7,8 @@ class UserProfile {
     required this.preferredCurrency,
     required this.preferredLanguage,
     required this.createdAt,
+    required this.isEmailVerified,
+    this.country,
   });
 
   final String name;
@@ -14,6 +16,8 @@ class UserProfile {
   final String preferredCurrency;
   final String preferredLanguage;
   final DateTime createdAt;
+  final bool isEmailVerified;
+  final String? country;
 
   String get initials {
     final parts = name.trim().split(' ');
@@ -29,5 +33,7 @@ class UserProfile {
         preferredCurrency: dto.preferredCurrency,
         preferredLanguage: dto.preferredLanguage,
         createdAt: dto.createdAt,
+        isEmailVerified: dto.isEmailVerified,
+        country: dto.country,
       );
 }

@@ -111,7 +111,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     });
 
     try {
-      final token = await ref.read(authRepositoryProvider).register(
+      final response = await ref.read(authRepositoryProvider).register(
             RegisterRequestDto(
               name: _nameController.text.trim(),
               email: _emailController.text.trim(),
@@ -119,8 +119,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ),
           );
       await ref.read(authNotifierProvider.notifier).onLoginSuccess(
-            accessToken: token,
-            refreshToken: '',
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
           );
     } on DioException catch (e) {
       final status = e.response?.statusCode;

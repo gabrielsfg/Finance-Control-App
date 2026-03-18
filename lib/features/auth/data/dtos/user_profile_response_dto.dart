@@ -10,6 +10,8 @@ class UserProfileResponseDto {
     required this.preferredCurrency,
     required this.preferredLanguage,
     required this.createdAt,
+    required this.isEmailVerified,
+    this.country,
   });
 
   final String name;
@@ -17,6 +19,9 @@ class UserProfileResponseDto {
   final String preferredCurrency;
   final String preferredLanguage;
   final DateTime createdAt;
+  @JsonKey(defaultValue: false)
+  final bool isEmailVerified;
+  final String? country;
 
   factory UserProfileResponseDto.fromJson(Map<String, dynamic> json) =>
       _$UserProfileResponseDtoFromJson(json);

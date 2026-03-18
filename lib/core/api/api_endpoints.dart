@@ -6,7 +6,13 @@ abstract class ApiEndpoints {
   // Auth — UserController
   static const String login = '/api/user/login';
   static const String register = '/api/user/register';
+  static const String refresh = '/api/user/refresh';
+  static const String logout = '/api/user/logout';
+  static const String forgotPassword = '/api/user/forgot-password';
+  static const String resetPassword = '/api/user/reset-password';
+  static const String verifyEmail = '/api/user/verify-email';
   static const String userMe = '/api/user/me';
+  static const String resetData = '/api/user/me/reset-data';
 
   // Main page
   static const String mainPageSummary = '/api/mainpage/summary';
