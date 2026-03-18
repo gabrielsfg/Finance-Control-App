@@ -175,11 +175,6 @@ class TransactionDetailPage extends ConsumerWidget {
                                 label: 'Budget',
                                 value: '#${transaction.budgetId}',
                               ),
-                            _DetailRow(
-                              label: 'Status',
-                              value: transaction.isPaid ? 'Paid' : 'Pending',
-                              showDivider: transaction.description != null,
-                            ),
                             if (transaction.description != null)
                               _DetailRow(
                                 label: 'Description',

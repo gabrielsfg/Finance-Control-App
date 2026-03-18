@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../data/auth_repository.dart';
 import '../data/dtos/register_request_dto.dart';
@@ -32,6 +33,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   String? _passwordError;
   String? _confirmPasswordError;
   String? _globalError;
+  PasswordStrength? _passwordStrength;
 
   @override
   void dispose() {
@@ -40,6 +42,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _onPasswordChanged(String value) {
+    setState(() {
+      _passwordError = null;
+      _passwordStrength =
+          value.isEmpty ? null : evaluatePasswordStrength(value);
+    });
   }
 
   bool _validate() {
@@ -62,10 +72,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       emailErr = 'E-mail inválido';
     }
 
-    if (_passwordController.text.isEmpty) {
+    final password = _passwordController.text;
+    if (password.isEmpty) {
       passErr = 'Informe uma senha';
-    } else if (_passwordController.text.length < 8) {
-      passErr = 'Mínimo 8 caracteres';
+    } else {
+      final strength = evaluatePasswordStrength(password);
+      if (strength == PasswordStrength.invalid) {
+        passErr =
+            'A senha deve ter 8+ caracteres, maiúscula, minúscula, número e caractere especial';
+      }
     }
 
     if (_confirmPasswordController.text.isEmpty) {
@@ -108,10 +123,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             refreshToken: '',
           );
     } on DioException catch (e) {
-      final body = e.response?.data;
-      final message = (body is Map && body['error'] is String)
-          ? body['error'] as String
-          : 'Não foi possível criar a conta. Tente novamente.';
+      final status = e.response?.statusCode;
+      final String message;
+      if (status == 429) {
+        message =
+            'Muitas tentativas. Aguarde 15 minutos antes de tentar novamente.';
+      } else {
+        final body = e.response?.data;
+        // FluentValidation returns ValidationProblemDetails:
+        // { "errors": { "FieldName": ["msg1", "msg2"] } }
+        if (body is Map && body['errors'] is Map) {
+          final errors = body['errors'] as Map;
+          final messages = errors.values
+              .expand((v) => v is List ? v.cast<String>() : <String>[])
+              .toList();
+          message = messages.isNotEmpty
+              ? messages.join('\n')
+              : 'Não foi possível criar a conta. Tente novamente.';
+        } else if (body is Map && body['error'] is String) {
+          message = body['error'] as String;
+        } else {
+          message = 'Não foi possível criar a conta. Tente novamente.';
+        }
+      }
       setState(() => _globalError = message);
     } catch (_) {
       setState(() =>
@@ -217,7 +251,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   obscureText: _obscurePassword,
                   errorText: _passwordError,
                   textInputAction: TextInputAction.next,
-                  onChanged: (_) => setState(() => _passwordError = null),
+                  onChanged: _onPasswordChanged,
                   rightIcon: GestureDetector(
                     onTap: () =>
                         setState(() => _obscurePassword = !_obscurePassword),
@@ -232,6 +266,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     ),
                   ),
                 ),
+                if (_passwordStrength != null) ...[
+                  const SizedBox(height: 8),
+                  _PasswordStrengthIndicator(strength: _passwordStrength!),
+                ],
                 const SizedBox(height: 14),
 
                 // ── Confirm password ───────────────────────────────────────
@@ -311,6 +349,56 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     );
   }
 }
+
+// ── Password Strength Indicator ────────────────────────────────────────────
+
+class _PasswordStrengthIndicator extends StatelessWidget {
+  const _PasswordStrengthIndicator({required this.strength});
+
+  final PasswordStrength strength;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+
+    final (label, color, filledSegments) = switch (strength) {
+      PasswordStrength.invalid => ('Fraca', t.error, 1),
+      PasswordStrength.weak => ('Fraca', t.error, 1),
+      PasswordStrength.medium => ('Média', const Color(0xFFF59E0B), 2),
+      PasswordStrength.strong => ('Forte', const Color(0xFF22C55E), 3),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(3, (i) {
+            final filled = i < filledSegments;
+            return Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+                height: 4,
+                decoration: BoxDecoration(
+                  color: filled
+                      ? color
+                      : t.divider.withValues(alpha: t.isDark ? 0.3 : 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Senha $label',
+          style: AppTextStyles.caption(color).copyWith(fontSize: 11),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Error Banner ───────────────────────────────────────────────────────────
 
 class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});

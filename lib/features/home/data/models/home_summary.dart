@@ -28,7 +28,7 @@ class HomeSummary {
 class RecentTransactionSummary {
   const RecentTransactionSummary({
     required this.id,
-    required this.description,
+    this.description,
     required this.valueCents,
     required this.isExpense,
     required this.subCategoryName,
@@ -36,7 +36,7 @@ class RecentTransactionSummary {
   });
 
   final int id;
-  final String description;
+  final String? description;
 
   /// Positive = income, negative = expense (cents).
   final int valueCents;

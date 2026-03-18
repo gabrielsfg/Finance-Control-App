@@ -6,6 +6,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/auth/providers/user_profile_provider.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -71,34 +73,43 @@ class _Header extends StatelessWidget {
 
 // ── Profile Card ───────────────────────────────────────────────────────────
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends ConsumerWidget {
   const _ProfileCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppThemeTokens.of(context);
+    final profileAsync = ref.watch(userProfileProvider);
+
+    final initials = profileAsync.valueOrNull?.initials ?? '?';
+    final name = profileAsync.valueOrNull?.name ?? '—';
+    final email = profileAsync.valueOrNull?.email ?? '—';
+    final memberSince = profileAsync.valueOrNull?.createdAt;
+    final memberLabel = memberSince != null
+        ? 'Member since ${memberSince.year}'
+        : '';
 
     return GlassCard(
       child: Row(
         children: [
-          const AppAvatar(initials: '?', size: 56),
+          AppAvatar(initials: initials, size: 56),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '—',
+                  name,
                   style: AppTextStyles.h3(t.txtPrimary),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '—',
+                  email,
                   style: AppTextStyles.bodySm(t.txtTertiary),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '',
+                  memberLabel,
                   style: AppTextStyles.caption(t.txtDisabled),
                 ),
               ],
@@ -281,12 +292,13 @@ class _SettingRowWidget extends StatelessWidget {
 
 // ── Preferences Section ────────────────────────────────────────────────────
 
-class _PreferencesSection extends StatelessWidget {
+class _PreferencesSection extends ConsumerWidget {
   const _PreferencesSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppThemeTokens.of(context);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +319,7 @@ class _PreferencesSection extends StatelessWidget {
               icon: LucideIcons.globe,
               iconColor: const Color(0xFF06B6D4),
               label: 'Language',
-              trailingLabel: 'Português',
+              trailingLabel: profile?.preferredLanguage,
               onTap: () {
                 // TODO: navigate to language settings
               },
@@ -316,7 +328,7 @@ class _PreferencesSection extends StatelessWidget {
               icon: LucideIcons.dollarSign,
               iconColor: const Color(0xFF22C55E),
               label: 'Currency',
-              trailingLabel: 'BRL',
+              trailingLabel: profile?.preferredCurrency,
               onTap: () {
                 // TODO: navigate to currency settings
               },
@@ -438,9 +450,30 @@ class _LogoutButton extends ConsumerWidget {
     final t = AppThemeTokens.of(context);
 
     return GestureDetector(
-      onTap: () {
-        // TODO: call ref.read(authNotifierProvider.notifier).logout()
-        // after auth is wired up
+      onTap: () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Log Out'),
+            content: const Text('Are you sure you want to log out?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Log Out',
+                  style: TextStyle(color: t.error),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          await ref.read(authNotifierProvider.notifier).logout();
+        }
       },
       child: Container(
         height: 48,

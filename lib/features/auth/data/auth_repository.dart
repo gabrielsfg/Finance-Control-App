@@ -5,6 +5,8 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
 import 'dtos/login_request_dto.dart';
 import 'dtos/register_request_dto.dart';
+import 'dtos/user_profile_response_dto.dart';
+import 'models/user_profile.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(ref.read(apiClientProvider).dio),
@@ -34,5 +36,12 @@ class AuthRepository {
       data: dto.toJson(),
     );
     return response.data as String;
+  }
+
+  Future<UserProfile> getProfile() async {
+    final response = await _dio.get(ApiEndpoints.userMe);
+    return UserProfile.fromDto(
+      UserProfileResponseDto.fromJson(response.data as Map<String, dynamic>),
+    );
   }
 }
