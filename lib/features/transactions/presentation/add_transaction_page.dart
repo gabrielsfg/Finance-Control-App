@@ -12,6 +12,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../accounts/data/models/account.dart';
+import '../../categories/providers/categories_provider.dart';
 import '../../categories/providers/subcategories_provider.dart';
 import '../data/dtos/category_response_dto.dart';
 import '../data/dtos/create_transaction_request_dto.dart';
@@ -210,8 +211,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     );
   }
 
-  void _openAccountPicker(List<Account> accounts) {
-    showModalBottomSheet(
+  Future<void> _openAccountPicker(List<Account> accounts) async {
+    final result = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -227,6 +228,14 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
         },
       ),
     );
+
+    if (result == 'create' && mounted) {
+      await context.push('/accounts/create');
+      if (mounted) {
+        final updated = await ref.read(accountsProvider.future);
+        _openAccountPicker(updated);
+      }
+    }
   }
 
   void _openRecurrencePicker() {
@@ -1313,6 +1322,22 @@ class _SubcategoryPickerPageState
       builder: (_) => _PickerCreateSubcategorySheet(
         categories: _categories,
         onCreated: () async {
+          ref.invalidate(categoriesProvider);
+          final updated = await ref.read(categoriesProvider.future);
+          if (mounted) setState(() => _categories = updated);
+        },
+      ),
+    );
+  }
+
+  void _openCreateCategorySheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _PickerCreateCategorySheet(
+        onCreated: () async {
+          ref.invalidate(categoriesProvider);
           final updated = await ref.read(categoriesProvider.future);
           if (mounted) setState(() => _categories = updated);
         },
@@ -1456,10 +1481,7 @@ class _SubcategoryPickerPageState
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          context.push('/categories/create');
-                        },
+                        onTap: _openCreateCategorySheet,
                         child: Container(
                           height: 44,
                           decoration: BoxDecoration(
@@ -1826,9 +1848,169 @@ class _PickerCreateSubcategorySheetState
   }
 }
 
+// ── Picker Create Category Sheet ────────────────────────────────────────────
+
+class _PickerCreateCategorySheet extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+
+  const _PickerCreateCategorySheet({required this.onCreated});
+
+  @override
+  ConsumerState<_PickerCreateCategorySheet> createState() =>
+      _PickerCreateCategorySheetState();
+}
+
+class _PickerCreateCategorySheetState
+    extends ConsumerState<_PickerCreateCategorySheet> {
+  final _nameController = TextEditingController();
+  bool _loading = false;
+  String? _nameError;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Digite um nome');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _nameError = null;
+    });
+    try {
+      await ref.read(categoriesNotifierProvider.notifier).createCategory(name);
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onCreated();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao criar categoria.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl3)),
+          boxShadow: AppShadows.bottomSheet,
+        ),
+        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPad + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: t.isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.pillAll,
+                ),
+              ),
+            ),
+            Text('Nova Categoria', style: AppTextStyles.h3(t.txtPrimary)),
+            const SizedBox(height: 20),
+            Text(
+              'Nome',
+              style: AppTextStyles.caption(t.txtSecondary)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              style: AppTextStyles.body(t.txtPrimary).copyWith(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Ex: Alimentação',
+                hintStyle:
+                    AppTextStyles.body(t.txtDisabled).copyWith(fontSize: 15),
+                errorText: _nameError,
+                filled: true,
+                fillColor: t.isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : t.primary.withValues(alpha: 0.04),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide:
+                      BorderSide(color: t.primary.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.baseAll,
+                  borderSide: BorderSide(color: t.primary, width: 1.5),
+                ),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: _loading ? null : _submit,
+              child: Container(
+                height: 50,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: _loading ? null : AppColors.primaryGradient,
+                  color:
+                      _loading ? t.primary.withValues(alpha: 0.4) : null,
+                  borderRadius: AppRadius.baseAll,
+                  boxShadow: _loading ? [] : AppShadows.primaryBtnShadow,
+                ),
+                child: Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          'Criar',
+                          style: AppTextStyles.body(Colors.white).copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Account Picker Bottom Sheet ─────────────────────────────────────────────
 
-class _AccountPickerSheet extends StatefulWidget {
+class _AccountPickerSheet extends ConsumerStatefulWidget {
   final List<Account> accounts;
   final int? selectedId;
   final void Function(int id, String name) onSelected;
@@ -1840,10 +2022,11 @@ class _AccountPickerSheet extends StatefulWidget {
   });
 
   @override
-  State<_AccountPickerSheet> createState() => _AccountPickerSheetState();
+  ConsumerState<_AccountPickerSheet> createState() =>
+      _AccountPickerSheetState();
 }
 
-class _AccountPickerSheetState extends State<_AccountPickerSheet> {
+class _AccountPickerSheetState extends ConsumerState<_AccountPickerSheet> {
   bool _editMode = false;
 
   @override
@@ -1910,9 +2093,7 @@ class _AccountPickerSheetState extends State<_AccountPickerSheet> {
                 const SizedBox(width: 8),
                 // Add button
                 GestureDetector(
-                  onTap: () {
-                    // TODO: navigate to add account page
-                  },
+                  onTap: () => Navigator.of(context).pop('create'),
                   child: Container(
                     width: 32,
                     height: 32,
