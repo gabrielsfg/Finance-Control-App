@@ -27,6 +27,10 @@ import '../../features/budgets/presentation/create_budget_step4_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 import '../../features/transactions/data/models/transaction_item.dart';
+import '../../features/wishlist/data/models/wishlist_item.dart';
+import '../../features/wishlist/presentation/wishlist_detail_page.dart';
+import '../../features/wishlist/presentation/wishlist_form_page.dart';
+import '../../features/wishlist/presentation/wishlist_page.dart';
 import '../../features/transactions/presentation/add_transaction_page.dart';
 import '../../features/transactions/presentation/edit_transaction_page.dart';
 import '../../features/transactions/presentation/transaction_detail_page.dart';
@@ -150,6 +154,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (_, _) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/wishlist',
+        builder: (_, _) => const WishlistPage(),
+      ),
+      GoRoute(
+        path: '/wishlist/create',
+        builder: (_, _) => const WishlistFormPage(),
+      ),
+      GoRoute(
+        path: '/wishlist/:id',
+        builder: (_, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          final item = state.extra as WishlistItem?;
+          return WishlistDetailPage(itemId: id, initialItem: item);
+        },
+      ),
+      GoRoute(
+        path: '/wishlist/:id/edit',
+        builder: (_, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          final item = state.extra as WishlistItem?;
+          return WishlistFormPage(itemId: id, initialItem: item);
+        },
       ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),

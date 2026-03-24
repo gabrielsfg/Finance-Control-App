@@ -354,6 +354,13 @@ class _AccountSection extends StatelessWidget {
         _SettingsCard(
           items: [
             _SettingRow(
+              icon: LucideIcons.gift,
+              iconColor: const Color(0xFFEC4899),
+              label: 'Lista de Desejos',
+              subtitle: 'Seus itens favoritos',
+              onTap: () => context.push('/wishlist'),
+            ),
+            _SettingRow(
               icon: LucideIcons.tag,
               iconColor: const Color(0xFF8B5CF6),
               label: 'Categorias',

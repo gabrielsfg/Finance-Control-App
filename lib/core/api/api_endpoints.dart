@@ -53,6 +53,13 @@ abstract class ApiEndpoints {
   // Payment methods
   static const String paymentMethods = '/api/payment-methods';
 
+  // Wishlist
+  static const String wishlist = '/api/wishlist';
+  static String wishlistById(int id) => '/api/wishlist/$id';
+  static String wishlistPrice(int id) => '/api/wishlist/$id/price';
+  static String wishlistPurchase(int id) => '/api/wishlist/$id/purchase';
+  static String wishlistPriceHistory(int id) => '/api/wishlist/$id/price-history';
+
   // Budgets
   static const String budgets = '/api/budget';
   static String budgetById(int id) => '/api/budget/$id';
