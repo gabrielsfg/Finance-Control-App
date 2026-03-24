@@ -322,18 +322,14 @@ class _PreferencesSection extends ConsumerWidget {
               iconColor: const Color(0xFF06B6D4),
               label: 'Language',
               trailingLabel: profile?.preferredLanguage,
-              onTap: () {
-                // TODO: navigate to language settings
-              },
+              onTap: () => context.push('/settings'),
             ),
             _SettingRow(
               icon: LucideIcons.dollarSign,
               iconColor: const Color(0xFF22C55E),
               label: 'Currency',
               trailingLabel: profile?.preferredCurrency,
-              onTap: () {
-                // TODO: navigate to currency settings
-              },
+              onTap: () => context.push('/settings'),
             ),
           ],
         ),

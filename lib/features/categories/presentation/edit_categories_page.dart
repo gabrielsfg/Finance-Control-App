@@ -448,10 +448,10 @@ class _CategoryGroupState extends ConsumerState<_CategoryGroup> {
           builder: (_) => AlertDialog(
             backgroundColor:
                 t.isDark ? const Color(0xFF1C1830) : Colors.white,
-            title: Text('Deletar categoria',
+            title: Text('Excluir categoria?',
                 style: AppTextStyles.h3(t.txtPrimary)),
             content: Text(
-              'Deseja deletar "${widget.category.name}"? Esta ação não pode ser desfeita.',
+              'Esta ação é permanente e irá excluir todas as subcategorias e transações vinculadas. Não é possível desfazer.',
               style: AppTextStyles.body(t.txtSecondary),
             ),
             actions: [
@@ -462,7 +462,7 @@ class _CategoryGroupState extends ConsumerState<_CategoryGroup> {
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text('Deletar',
+                child: Text('Excluir',
                     style: AppTextStyles.body(t.error)
                         .copyWith(fontWeight: FontWeight.w600)),
               ),

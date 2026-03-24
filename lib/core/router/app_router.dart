@@ -25,6 +25,7 @@ import '../../features/budgets/presentation/create_budget_step2_page.dart';
 import '../../features/budgets/presentation/create_budget_step3_page.dart';
 import '../../features/budgets/presentation/create_budget_step4_page.dart';
 import '../../features/home/presentation/home_page.dart';
+import '../../features/settings/presentation/settings_page.dart';
 import '../../features/transactions/data/models/transaction_item.dart';
 import '../../features/transactions/presentation/add_transaction_page.dart';
 import '../../features/transactions/presentation/edit_transaction_page.dart';
@@ -145,6 +146,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/budgets/create/step4',
         builder: (_, _) => const CreateBudgetStep4Page(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (_, _) => const SettingsPage(),
       ),
       ShellRoute(
         builder: (context, _, child) => AppShell(child: child),
