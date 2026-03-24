@@ -9,9 +9,16 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../../settings/data/banks_repository.dart';
 import '../data/dtos/create_account_request_dto.dart';
 import '../data/models/account.dart';
 import '../providers/accounts_provider.dart';
+
+// ── Bank picker provider (file-scoped) ──────────────────────────────────────
+
+final _banksProvider = FutureProvider<List<BankDto>>((ref) {
+  return ref.read(banksRepositoryProvider).getBanks();
+});
 
 class CreateAccountPage extends ConsumerStatefulWidget {
   const CreateAccountPage({super.key});
@@ -30,6 +37,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
   bool _isDefault = true;
   bool _excludeFromNetWorth = false;
   bool _isLoading = false;
+  BankDto? _selectedBank;
 
   String? _nameError;
   String? _creditLimitError;
@@ -81,6 +89,27 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
     });
 
     return nameErr == null && creditErr == null && dayErr == null;
+  }
+
+  void _openBankPicker(BuildContext context, List<BankDto> banks) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _BankPickerSheet(
+        banks: banks,
+        selected: _selectedBank,
+        onSelected: (bank) {
+          setState(() {
+            _selectedBank = bank;
+            if (bank != null && _nameController.text.trim().isEmpty) {
+              _nameController.text = bank.name;
+              _nameError = null;
+            }
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -171,6 +200,57 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage> {
                   }),
                 ),
                 const SizedBox(height: 20),
+                // ── Bank picker ───────────────────────────────────────────────
+                Consumer(
+                  builder: (context, ref, _) {
+                    final banks = ref.watch(_banksProvider).valueOrNull ?? [];
+                    return GestureDetector(
+                      onTap: banks.isEmpty
+                          ? null
+                          : () => _openBankPicker(context, banks),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: t.surfaceEl
+                              .withValues(alpha: t.isDark ? 0.3 : 0.5),
+                          borderRadius: AppRadius.baseAll,
+                          border: Border.all(
+                              color: t.divider.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(LucideIcons.building2,
+                                size: 16, color: t.txtTertiary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _selectedBank?.name ??
+                                    'Select bank (optional)',
+                                style: AppTextStyles.body(
+                                  _selectedBank != null
+                                      ? t.txtPrimary
+                                      : t.txtDisabled,
+                                ).copyWith(fontSize: 14),
+                              ),
+                            ),
+                            if (_selectedBank != null)
+                              GestureDetector(
+                                onTap: () =>
+                                    setState(() => _selectedBank = null),
+                                child: Icon(LucideIcons.x,
+                                    size: 14, color: t.txtTertiary),
+                              )
+                            else
+                              Icon(LucideIcons.chevronDown,
+                                  size: 16, color: t.txtDisabled),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
                 // ── Account name ─────────────────────────────────────────────
                 AppInputField(
                   label: 'Account name',
@@ -420,6 +500,182 @@ class _ToggleRow extends StatelessWidget {
           activeThumbColor: t.primary,
         ),
       ],
+    );
+  }
+}
+
+// ── Bank Picker Sheet ───────────────────────────────────────────────────────
+
+class _BankPickerSheet extends StatefulWidget {
+  final List<BankDto> banks;
+  final BankDto? selected;
+  final ValueChanged<BankDto?> onSelected;
+
+  const _BankPickerSheet({
+    required this.banks,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  State<_BankPickerSheet> createState() => _BankPickerSheetState();
+}
+
+class _BankPickerSheetState extends State<_BankPickerSheet> {
+  final _searchController = TextEditingController();
+  List<BankDto> _filtered = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.banks;
+    _searchController.addListener(_onSearch);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch() {
+    final q = _searchController.text.toLowerCase();
+    setState(() {
+      _filtered = widget.banks
+          .where((b) =>
+              b.name.toLowerCase().contains(q) ||
+              (b.code?.contains(q) ?? false))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: AppShadows.bottomSheet,
+      ),
+      padding: EdgeInsets.fromLTRB(0, 0, 0, bottomPad + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: t.isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Select Bank', style: AppTextStyles.h3(t.txtPrimary)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    prefixIcon: Icon(LucideIcons.search,
+                        size: 16, color: t.txtTertiary),
+                    isDense: true,
+                    filled: true,
+                    fillColor: t.surfaceEl.withValues(alpha: 0.4),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                // Clear option
+                GestureDetector(
+                  onTap: () {
+                    widget.onSelected(null);
+                    Navigator.of(context).pop();
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    child: Text(
+                      'None',
+                      style: AppTextStyles.body(
+                        widget.selected == null ? t.primary : t.txtSecondary,
+                      ).copyWith(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ),
+                ..._filtered.map((bank) {
+                  final isSelected = bank.id == widget.selected?.id;
+                  return GestureDetector(
+                    onTap: () {
+                      widget.onSelected(bank);
+                      Navigator.of(context).pop();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  bank.name,
+                                  style: AppTextStyles.body(
+                                    isSelected ? t.primary : t.txtPrimary,
+                                  ).copyWith(
+                                    fontSize: 14,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                                if (bank.code != null)
+                                  Text(
+                                    bank.code!,
+                                    style:
+                                        AppTextStyles.caption(t.txtTertiary),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(LucideIcons.check,
+                                size: 18, color: t.primary),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

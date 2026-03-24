@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/paged_response.dart';
 import 'dtos/create_transaction_request_dto.dart';
 import 'dtos/create_transaction_response_dto.dart';
 import 'dtos/get_transaction_response_dto.dart';
@@ -34,12 +35,41 @@ class TransactionRepository {
 
   // ── Read ─────────────────────────────────────────────────────────────────
 
-  Future<List<GetTransactionResponseDto>> getAllTransactions() async {
-    final response = await _dio.get(ApiEndpoints.transactions);
-    return (response.data as List)
-        .map((e) =>
-            GetTransactionResponseDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<PagedResponse<GetTransactionResponseDto>> getTransactions({
+    int page = 1,
+    int pageSize = 20,
+    String orderBy = 'date_desc',
+    String? startDate,
+    String? endDate,
+    String? type,
+    String? paymentType,
+    int? accountId,
+    int? subCategoryId,
+    int? minValue,
+    int? maxValue,
+    String? search,
+  }) async {
+    final response = await _dio.get(
+      ApiEndpoints.transactions,
+      queryParameters: {
+        'page': page,
+        'pageSize': pageSize,
+        'orderBy': orderBy,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+        if (type != null) 'type': type,
+        if (paymentType != null) 'paymentType': paymentType,
+        if (accountId != null) 'accountId': accountId,
+        if (subCategoryId != null) 'subCategoryId': subCategoryId,
+        if (minValue != null) 'minValue': minValue,
+        if (maxValue != null) 'maxValue': maxValue,
+        if (search != null && search.isNotEmpty) 'search': search,
+      },
+    );
+    return PagedResponse.fromJson(
+      response.data as Map<String, dynamic>,
+      GetTransactionResponseDto.fromJson,
+    );
   }
 
   Future<GetTransactionResponseDto> getTransactionById(int id) async {

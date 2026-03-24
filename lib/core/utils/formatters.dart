@@ -193,6 +193,23 @@ PasswordStrength evaluatePasswordStrength(String password) {
   return PasswordStrength.weak;
 }
 
+/// Converts an ISO 3166-1 alpha-2 country code to a flag emoji.
+///
+/// Uses Regional Indicator Symbol arithmetic: each letter + 0x1F1A5 maps to
+/// the corresponding Regional Indicator Symbol Letter (A–Z).
+///
+/// Examples:
+///   countryCodeToFlag("BR") → "🇧🇷"
+///   countryCodeToFlag("US") → "🇺🇸"
+///   countryCodeToFlag("PT") → "🇵🇹"
+String countryCodeToFlag(String isoCode) {
+  if (isoCode.length != 2) return '';
+  final upper = isoCode.toUpperCase();
+  final first = String.fromCharCode(upper.codeUnitAt(0) + 0x1F1A5);
+  final second = String.fromCharCode(upper.codeUnitAt(1) + 0x1F1A5);
+  return '$first$second';
+}
+
 /// Formats a lockout duration in seconds to a user-friendly Portuguese string.
 ///
 /// Examples:

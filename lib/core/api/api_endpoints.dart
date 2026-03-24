@@ -44,6 +44,15 @@ abstract class ApiEndpoints {
   static String subcategoryById(int id) => '/api/SubCategory/$id';
   static String deleteSubcategory(int id) => '/api/SubCategory/$id';
 
+  // Currencies
+  static const String currencies = '/api/currencies';
+
+  // Banks
+  static const String banks = '/api/banks';
+
+  // Payment methods
+  static const String paymentMethods = '/api/payment-methods';
+
   // Budgets
   static const String budgets = '/api/budget';
   static String budgetById(int id) => '/api/budget/$id';

@@ -18,6 +18,7 @@ import '../data/dtos/category_response_dto.dart';
 import '../data/dtos/create_transaction_request_dto.dart';
 import '../providers/picker_providers.dart';
 import '../providers/transaction_provider.dart';
+import '../../settings/data/payment_methods_repository.dart';
 
 // ── Enums ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
   _PaymentType _paymentType = _PaymentType.oneTime;
   int _installmentCount = 2;
   String? _recurrence;
+  String? _paymentMethod;
   bool _includeInBudget = true;
 
   // Validation errors
@@ -135,6 +137,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
+      paymentMethod: _paymentMethod,
       totalInstallments:
           _paymentType == _PaymentType.installment ? _installmentCount : null,
       recurrence:
@@ -251,6 +254,19 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
             _recurrenceError = null;
           });
         },
+      ),
+    );
+  }
+
+  void _openPaymentMethodPicker(List<String> methods) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _PaymentMethodPickerSheet(
+        methods: methods,
+        selected: _paymentMethod,
+        onSelected: (value) => setState(() => _paymentMethod = value),
       ),
     );
   }
@@ -462,6 +478,38 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
                                   ],
                                 )
                               : const SizedBox.shrink(),
+                        ),
+                        _InternalDivider(),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final methodsAsync = ref.watch(
+                              _paymentMethodsProvider,
+                            );
+                            final methods =
+                                methodsAsync.valueOrNull ?? const [];
+                            return _FieldRow(
+                              label: 'Payment Method',
+                              value: _paymentMethod ?? 'Optional',
+                              onTap: isLoading || methods.isEmpty
+                                  ? () {}
+                                  : () => _openPaymentMethodPicker(methods),
+                              showDivider: false,
+                              trailing: _paymentMethod != null
+                                  ? GestureDetector(
+                                      onTap: () => setState(
+                                        () => _paymentMethod = null,
+                                      ),
+                                      child: Icon(
+                                        LucideIcons.x,
+                                        size: 14,
+                                        color: AppThemeTokens.of(
+                                          context,
+                                        ).txtTertiary,
+                                      ),
+                                    )
+                                  : null,
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -825,6 +873,7 @@ class _FieldRow extends StatelessWidget {
   final VoidCallback onTap;
   final String? errorText;
   final bool showDivider;
+  final Widget? trailing;
 
   const _FieldRow({
     required this.label,
@@ -832,6 +881,7 @@ class _FieldRow extends StatelessWidget {
     required this.onTap,
     this.errorText,
     this.showDivider = true,
+    this.trailing,
   });
 
   @override
@@ -869,6 +919,10 @@ class _FieldRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
+                    if (trailing != null) ...[
+                      trailing!,
+                      const SizedBox(width: 4),
+                    ],
                     Icon(LucideIcons.chevronRight, size: 16, color: t.txtDisabled),
                   ],
                 ),
@@ -2180,6 +2234,127 @@ class _AccountPickerSheetState extends ConsumerState<_AccountPickerSheet> {
 }
 
 // ── Recurrence Picker Bottom Sheet ──────────────────────────────────────────
+
+// ── Payment methods provider (file-scoped) ──────────────────────────────────
+
+final _paymentMethodsProvider = FutureProvider<List<String>>((ref) {
+  return ref.read(paymentMethodsRepositoryProvider).getPaymentMethods();
+});
+
+// ── Payment Method Picker Sheet ─────────────────────────────────────────────
+
+class _PaymentMethodPickerSheet extends StatelessWidget {
+  final List<String> methods;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  const _PaymentMethodPickerSheet({
+    required this.methods,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppThemeTokens.of(context);
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: t.isDark ? const Color(0xFF1C1830) : Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl3),
+        ),
+        boxShadow: AppShadows.bottomSheet,
+      ),
+      padding: EdgeInsets.fromLTRB(0, 0, 0, bottomPad + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: t.isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.12),
+              borderRadius: AppRadius.pillAll,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Payment Method',
+                  style: AppTextStyles.h3(t.txtPrimary)),
+            ),
+          ),
+          // Clear option
+          GestureDetector(
+            onTap: () {
+              onSelected(null);
+              Navigator.of(context).pop();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'None',
+                    style: AppTextStyles.body(
+                      selected == null ? t.primary : t.txtSecondary,
+                    ).copyWith(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  if (selected == null)
+                    Icon(LucideIcons.check, size: 18, color: t.primary),
+                ],
+              ),
+            ),
+          ),
+          ...methods.map((method) {
+            final isSelected = method == selected;
+            return GestureDetector(
+              onTap: () {
+                onSelected(method);
+                Navigator.of(context).pop();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      method,
+                      style: AppTextStyles.body(
+                        isSelected ? t.primary : t.txtPrimary,
+                      ).copyWith(
+                        fontSize: 14,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                    if (isSelected)
+                      Icon(LucideIcons.check, size: 18, color: t.primary),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Recurrence Picker Sheet ─────────────────────────────────────────────────
 
 class _RecurrencePickerSheet extends StatelessWidget {
   final String? selected;

@@ -19,6 +19,7 @@ class TransactionItem {
 
   final DateTime date;
   final String? description;
+  final String? paymentMethod;
   final int? budgetId;
   final int? recurringTransactionId;
   final int? parentTransactionId;
@@ -36,6 +37,7 @@ class TransactionItem {
     required this.paymentType,
     required this.date,
     this.description,
+    this.paymentMethod,
     this.budgetId,
     this.recurringTransactionId,
     this.parentTransactionId,
@@ -58,6 +60,7 @@ class TransactionItem {
       paymentType: dto.paymentType,
       date: DateTime.parse(dto.transactionDate),
       description: dto.description,
+      paymentMethod: dto.paymentMethod,
       budgetId: dto.budgetId,
       recurringTransactionId: dto.recurringTransactionId,
       parentTransactionId: dto.parentTransactionId,

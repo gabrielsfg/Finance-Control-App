@@ -9,10 +9,15 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../../settings/data/banks_repository.dart';
 import '../data/dtos/update_account_request_dto.dart';
 import '../data/models/account.dart';
 import '../data/models/account_detail.dart';
 import '../providers/accounts_provider.dart';
+
+final _editBanksProvider = FutureProvider<List<BankDto>>((ref) {
+  return ref.read(banksRepositoryProvider).getBanks();
+});
 
 class EditAccountPage extends ConsumerStatefulWidget {
   final int accountId;
@@ -33,6 +38,7 @@ class _EditAccountPageState extends ConsumerState<EditAccountPage> {
   bool _isDefault = false;
   bool _excludeFromNetWorth = false;
   bool _initialized = false;
+  BankDto? _selectedBank;
 
   String? _nameError;
   String? _creditLimitError;
@@ -249,6 +255,59 @@ class _EditAccountPageState extends ConsumerState<EditAccountPage> {
                       }),
                     ),
                     const SizedBox(height: 20),
+                    // ── Bank picker ────────────────────────────────────────
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final t = AppThemeTokens.of(context);
+                        final banks =
+                            ref.watch(_editBanksProvider).valueOrNull ?? [];
+                        return GestureDetector(
+                          onTap: banks.isEmpty
+                              ? null
+                              : () => _openBankPicker(context, banks),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: t.surfaceEl
+                                  .withValues(alpha: t.isDark ? 0.3 : 0.5),
+                              borderRadius: AppRadius.baseAll,
+                              border: Border.all(
+                                  color: t.divider.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(LucideIcons.building2,
+                                    size: 16, color: t.txtTertiary),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _selectedBank?.name ??
+                                        'Select bank (optional)',
+                                    style: AppTextStyles.body(
+                                      _selectedBank != null
+                                          ? t.txtPrimary
+                                          : t.txtDisabled,
+                                    ).copyWith(fontSize: 14),
+                                  ),
+                                ),
+                                if (_selectedBank != null)
+                                  GestureDetector(
+                                    onTap: () => setState(
+                                        () => _selectedBank = null),
+                                    child: Icon(LucideIcons.x,
+                                        size: 14, color: t.txtTertiary),
+                                  )
+                                else
+                                  Icon(LucideIcons.chevronDown,
+                                      size: 16, color: t.txtDisabled),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
                     // ── Account name ───────────────────────────────────────
                     AppInputField(
                       label: 'Account name',
