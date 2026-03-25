@@ -4,9 +4,19 @@
 ![Dart](https://img.shields.io/badge/Dart-3.11+-0175C2?style=flat&logo=dart)
 ![Riverpod](https://img.shields.io/badge/State-Riverpod_2-00BCD4?style=flat)
 ![Platform](https://img.shields.io/badge/Platform-Android_%7C_iOS-lightgrey?style=flat)
-![Status](https://img.shields.io/badge/Status-In_Development-yellow?style=flat)
+![Status](https://img.shields.io/badge/Status-Moved_to_Monorepo-blue?style=flat)
 
-A Flutter mobile app for personal finance tracking on Android and iOS. Designed around a core UX constraint: **register a transaction in under 10 seconds**. Consumes the [Finance Control API](https://github.com/gabrielsfg/FinanceControl) — a .NET 9 backend with JWT authentication.
+> ## ⚠️ This repository is no longer maintained
+>
+> Development has moved to a **monorepo** that combines the Flutter app and the .NET API in one place.
+>
+> ### 👉 [github.com/gabrielsfg/Finance-Control](https://github.com/gabrielsfg/Finance-Control)
+>
+> This repository is kept as a reference only. All new code, issues, and pull requests should go to the monorepo above.
+
+---
+
+A Flutter mobile app for personal finance tracking on Android and iOS. Designed around a core UX constraint: **register a transaction in under 10 seconds**. Consumes a .NET 9 backend with JWT authentication.
 
 ---
 
@@ -14,7 +24,7 @@ A Flutter mobile app for personal finance tracking on Android and iOS. Designed 
 
 Finance Control App is the mobile frontend of a full-stack personal finance system. The app is built for users who want intentional, manual control over their finances — no automatic bank imports. Every transaction is entered deliberately, so the UX is optimized for speed and minimal friction.
 
-The app covers the full financial picture: multiple accounts with net worth tracking, a hierarchical category and budget system, recurring transactions, and a dashboard that surfaces spending patterns and budget performance at a glance.
+The app covers the full financial picture: multiple accounts (checking, savings, credit card, cash) with net worth tracking, a hierarchical category and budget system, recurring transactions, and a dashboard that surfaces spending patterns and budget performance at a glance.
 
 This is a personal project built to deepen expertise in Flutter, Riverpod state management, and feature-first mobile architecture.
 
@@ -29,12 +39,13 @@ This is a personal project built to deepen expertise in Flutter, Riverpod state 
 | Auth-aware navigation with auto-redirect | ✅ Done |
 | API client with auth interceptor (auto 401 logout) | ✅ Done |
 | Material 3 theme with light/dark mode | ✅ Done |
-| Account management screens | 🚧 In Progress |
-| Transaction entry (one-time, installment, recurring) | 🚧 In Progress |
-| Budget tracking with progress visualization | 🚧 In Progress |
-| Dashboard (balance, income/expense, top categories) | 🚧 In Progress |
-| Category & subcategory management | 🚧 In Progress |
-| Profile screen | 🚧 In Progress |
+| Account management (Checking / Savings / Credit / Cash) | ✅ Done |
+| Transaction entry (one-time, installment, recurring) | ✅ Done |
+| Budget tracking with progress visualization | ✅ Done |
+| Dashboard (balance, income/expense, top categories) | ✅ Done |
+| Category & subcategory management | ✅ Done |
+| Wishlist (price tracking, purchase flow) | ✅ Done |
+| Profile & settings screen | ✅ Done |
 
 ---
 
@@ -75,8 +86,9 @@ lib/
 │   ├── transactions/ # Transaction management — repo + providers + pages
 │   ├── budgets/      # Budget tracking — repo + providers + pages
 │   ├── categories/   # Category/subcategory — repo + providers + pages
+│   ├── wishlist/     # Wishlist with price history and purchase flow
 │   ├── home/         # Dashboard summary
-│   └── profile/      # User profile
+│   └── profile/      # User profile + settings
 │
 └── shared/
     └── widgets/      # Reusable UI components (AppShell, buttons, etc.)
@@ -94,11 +106,14 @@ lib/
 
 ## Getting Started
 
+> The active codebase lives in the monorepo: [github.com/gabrielsfg/Finance-Control](https://github.com/gabrielsfg/Finance-Control).
+> The instructions below apply to this snapshot.
+
 ### Prerequisites
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (Dart 3.11+)
 - Android Studio or Xcode (for emulator/simulator)
-- [Finance Control API](https://github.com/gabrielsfg/FinanceControl) running locally or on a remote server
+- Finance Control API running locally or on a remote server
 
 ### Installation
 
@@ -120,7 +135,7 @@ Set the API base URL in `lib/core/config/app_config.dart` by changing the `_curr
 
 ```dart
 // Android emulator maps to host machine's localhost
-static const _current = AppEnv.local; // baseUrl: http://10.0.2.2:5112
+static const _current = AppEnv.local; // baseUrl: http://10.0.2.2:5000
 
 // iOS simulator uses localhost directly
 // For physical device: update AppEnv.local to your machine's LAN IP
@@ -141,18 +156,8 @@ flutter devices
 
 ---
 
-## Related Repository
+## Monorepo
 
-This app consumes the **Finance Control API** — a RESTful .NET 9 backend with PostgreSQL, JWT auth, and full Swagger documentation.
+This app and its .NET 9 backend have been consolidated into a single monorepo for easier development:
 
-[Finance Control API →](https://github.com/gabrielsfg/FinanceControl)
-
----
-
-## Project Status
-
-The project infrastructure is complete (auth flow, navigation, API client, theming, architecture). Feature screens are **actively being developed**.
-
-**Done:** JWT authentication, auth-aware routing, API integration layer, secure token storage, Material 3 theming with light/dark mode support.
-
-**In progress:** All feature screens — accounts, transactions, budgets, categories, dashboard, and profile.
+[**Finance-Control monorepo →**](https://github.com/gabrielsfg/Finance-Control)
