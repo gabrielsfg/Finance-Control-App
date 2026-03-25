@@ -14,9 +14,9 @@ class GetTransactionResponseDto {
     required this.type,
     required this.transactionDate,
     required this.paymentType,
-    required this.isPaid,
-    this.budgetId,
     this.description,
+    this.paymentMethod,
+    this.budgetId,
     this.recurringTransactionId,
     this.parentTransactionId,
     this.installmentNumber,
@@ -41,9 +41,9 @@ class GetTransactionResponseDto {
   /// "OneTime" | "Installment" | "Recurring"
   final String paymentType;
 
-  final bool isPaid;
-  final int? budgetId;
   final String? description;
+  final String? paymentMethod;
+  final int? budgetId;
   final int? recurringTransactionId;
   final int? parentTransactionId;
   final int? installmentNumber;

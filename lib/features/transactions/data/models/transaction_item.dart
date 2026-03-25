@@ -18,9 +18,9 @@ class TransactionItem {
   final String paymentType;
 
   final DateTime date;
-  final bool isPaid;
-  final int? budgetId;
   final String? description;
+  final String? paymentMethod;
+  final int? budgetId;
   final int? recurringTransactionId;
   final int? parentTransactionId;
   final int? installmentNumber;
@@ -36,9 +36,9 @@ class TransactionItem {
     required this.type,
     required this.paymentType,
     required this.date,
-    required this.isPaid,
-    this.budgetId,
     this.description,
+    this.paymentMethod,
+    this.budgetId,
     this.recurringTransactionId,
     this.parentTransactionId,
     this.installmentNumber,
@@ -59,9 +59,9 @@ class TransactionItem {
       type: dto.type,
       paymentType: dto.paymentType,
       date: DateTime.parse(dto.transactionDate),
-      isPaid: dto.isPaid,
-      budgetId: dto.budgetId,
       description: dto.description,
+      paymentMethod: dto.paymentMethod,
+      budgetId: dto.budgetId,
       recurringTransactionId: dto.recurringTransactionId,
       parentTransactionId: dto.parentTransactionId,
       installmentNumber: dto.installmentNumber,

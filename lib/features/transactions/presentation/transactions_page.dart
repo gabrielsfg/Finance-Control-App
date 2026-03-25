@@ -26,40 +26,49 @@ class TransactionsPage extends ConsumerStatefulWidget {
 class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   _TransactionFilter _filter = _TransactionFilter.all;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(transactionsNotifierProvider.notifier).loadNextPage();
+    }
+  }
 
   void _previousMonth() {
-    setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-    });
+    final newMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+    setState(() => _selectedMonth = newMonth);
+    ref.read(transactionsNotifierProvider.notifier).loadMonth(newMonth);
   }
 
   void _nextMonth() {
-    setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-    });
+    final newMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    setState(() => _selectedMonth = newMonth);
+    ref.read(transactionsNotifierProvider.notifier).loadMonth(newMonth);
   }
 
-  List<TransactionItem> _applyFilters(List<TransactionItem> all) {
-    // Filter by selected month
-    var filtered = all.where((t) {
-      return t.date.year == _selectedMonth.year &&
-          t.date.month == _selectedMonth.month;
-    }).toList();
-
-    // Filter by type/recurrence
-    filtered = switch (_filter) {
+  List<TransactionItem> _applyFilter(List<TransactionItem> all) {
+    return switch (_filter) {
       _TransactionFilter.expenses =>
-        filtered.where((t) => t.type == 'Expense').toList(),
+        all.where((t) => t.type == 'Expense').toList(),
       _TransactionFilter.income =>
-        filtered.where((t) => t.type == 'Income').toList(),
+        all.where((t) => t.type == 'Income').toList(),
       _TransactionFilter.recurring =>
-        filtered.where((t) => t.paymentType == 'Recurring').toList(),
-      _TransactionFilter.all => filtered,
+        all.where((t) => t.paymentType == 'Recurring').toList(),
+      _TransactionFilter.all => all,
     };
-
-    // Sort newest first
-    filtered.sort((a, b) => b.date.compareTo(a.date));
-    return filtered;
   }
 
   List<TransactionGroup> _groupByDate(List<TransactionItem> items) {
@@ -84,8 +93,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         child: asyncTx.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
-          data: (allTransactions) {
-            final filtered = _applyFilters(allTransactions);
+          data: (txState) {
+            final filtered = _applyFilter(txState.items);
             final groups = _groupByDate(filtered);
 
             final income = filtered
@@ -97,6 +106,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             final balance = income - expense;
 
             return CustomScrollView(
+              controller: _scrollController,
               slivers: [
                 SliverPadding(
                   padding: AppSpacing.screenPadding.copyWith(bottom: 0),
@@ -138,11 +148,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       ),
                     ),
                   )
-                else
+                else ...[
                   SliverPadding(
                     padding: AppSpacing.screenPadding.copyWith(
                       top: 0,
-                      bottom: bottomPad + 76 + 24,
+                      bottom: txState.isLoadingMore ? 8 : bottomPad + 76 + 24,
                     ),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
@@ -152,6 +162,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       ),
                     ),
                   ),
+                  if (txState.isLoadingMore)
+                    SliverPadding(
+                      padding: EdgeInsets.only(bottom: bottomPad + 76 + 24),
+                      sliver: const SliverToBoxAdapter(
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                ],
               ],
             );
           },
@@ -471,7 +489,8 @@ class _TransactionRow extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: (isExpense ? t.error : t.success).withValues(alpha: 0.15),
+                    color: (isExpense ? t.error : t.success)
+                        .withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Center(

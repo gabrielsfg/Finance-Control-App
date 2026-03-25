@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/router/app_router.dart';
+import 'core/storage/local_preferences.dart';
 import 'core/theme/app_theme.dart';
 
-// TODO: remove before production — temporary theme toggle for visual testing
-final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+final themeModeProvider = StateProvider<ThemeMode>((ref) {
+  return ref.read(localPreferencesProvider).getThemeMode();
+});
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: FinanceControlApp()));
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const FinanceControlApp(),
+    ),
+  );
 }
 
 class FinanceControlApp extends ConsumerWidget {

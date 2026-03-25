@@ -1,11 +1,20 @@
 /// Application environment configuration.
 ///
-/// To switch environments, change [_current] to the desired [AppEnv].
-/// In CI/CD, you can swap this via dart-define or a build flavor.
+/// The active environment is set at build time via --dart-define:
+///   flutter run --dart-define=APP_ENV=local        (default)
+///   flutter run --dart-define=APP_ENV=staging
+///   flutter run --dart-define=APP_ENV=production
 enum AppEnv { local, staging, production }
 
 abstract class AppConfig {
-  static const AppEnv _current = AppEnv.local;
+  static const String _envName =
+      String.fromEnvironment('APP_ENV', defaultValue: 'local');
+
+  static final AppEnv _current = switch (_envName) {
+    'staging' => AppEnv.staging,
+    'production' => AppEnv.production,
+    _ => AppEnv.local,
+  };
 
   /// Base URL for the REST API (no trailing slash).
   static String get apiBaseUrl {

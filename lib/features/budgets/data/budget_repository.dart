@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/paged_response.dart';
 import 'dtos/allocation_request_dto.dart';
 import 'dtos/allocation_response_dto.dart';
 import 'dtos/budget_response_dto.dart';
@@ -20,11 +21,24 @@ class BudgetRepository {
 
   // ── Budget CRUD ────────────────────────────────────────────────────────────
 
-  Future<List<GetAllBudgetResponseDto>> getAllBudgets() async {
-    final response = await _dio.get(ApiEndpoints.budgets);
-    return (response.data as List)
-        .map((e) => GetAllBudgetResponseDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<List<GetAllBudgetResponseDto>> getAllBudgets({
+    int page = 1,
+    int pageSize = 20,
+    String orderBy = 'name_asc',
+  }) async {
+    final response = await _dio.get(
+      ApiEndpoints.budgets,
+      queryParameters: {
+        'page': page,
+        'pageSize': pageSize,
+        'orderBy': orderBy,
+      },
+    );
+    final paged = PagedResponse.fromJson(
+      response.data as Map<String, dynamic>,
+      GetAllBudgetResponseDto.fromJson,
+    );
+    return paged.items;
   }
 
   Future<GetBudgetByIdResponseDto> getBudgetById(int id) async {

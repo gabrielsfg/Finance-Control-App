@@ -508,7 +508,7 @@ class _TransactionRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      data.description,
+                      data.description ?? data.subCategoryName,
                       style: AppTextStyles.body(t.txtPrimary).copyWith(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,

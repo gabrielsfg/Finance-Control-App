@@ -13,6 +13,7 @@ class CreateTransactionRequestDto {
     required this.paymentType,
     required this.includeInBudget,
     this.description,
+    this.paymentMethod,
     this.totalInstallments,
     this.recurrence,
   });
@@ -34,6 +35,9 @@ class CreateTransactionRequestDto {
 
   final bool includeInBudget;
   final String? description;
+
+  /// Optional. e.g. "PIX", "DINHEIRO". Not applicable for Transfer.
+  final String? paymentMethod;
 
   /// Required when paymentType == "Installment". Must be > 1.
   final int? totalInstallments;

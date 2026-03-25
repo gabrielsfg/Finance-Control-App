@@ -151,3 +151,76 @@ String formatMonthYear(DateTime date) => '${monthName(date.month)} ${date.year}'
 /// Returns a formatted date string like "18/02/2026".
 String formatDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+/// Password strength levels.
+enum PasswordStrength { invalid, weak, medium, strong }
+
+/// Evaluates the strength of a password.
+///
+/// Requirements to be considered valid (not [PasswordStrength.invalid]):
+///   - At least 8 characters
+///   - At least 1 uppercase letter
+///   - At least 1 lowercase letter
+///   - At least 1 digit
+///   - At least 1 special character
+///
+/// Beyond the minimum, scoring:
+///   - [PasswordStrength.weak]   — meets minimum exactly (score = 0 bonus)
+///   - [PasswordStrength.medium] — 1 bonus point (length ≥ 12 OR variety breadth)
+///   - [PasswordStrength.strong] — 2+ bonus points (length ≥ 14 AND extra variety)
+PasswordStrength evaluatePasswordStrength(String password) {
+  if (password.length < 8) return PasswordStrength.invalid;
+
+  final hasUpper = RegExp(r'[A-Z]').hasMatch(password);
+  final hasLower = RegExp(r'[a-z]').hasMatch(password);
+  final hasDigit = RegExp(r'[0-9]').hasMatch(password);
+  final hasSpecial = RegExp(r'[^A-Za-z0-9]').hasMatch(password);
+
+  if (!hasUpper || !hasLower || !hasDigit || !hasSpecial) {
+    return PasswordStrength.invalid;
+  }
+
+  // Minimum requirements met — compute bonus score.
+  var bonus = 0;
+  if (password.length >= 12) bonus++;
+  if (password.length >= 14) bonus++;
+  // Extra special characters (more than one)
+  final specialCount = RegExp(r'[^A-Za-z0-9]').allMatches(password).length;
+  if (specialCount >= 2) bonus++;
+
+  if (bonus >= 2) return PasswordStrength.strong;
+  if (bonus == 1) return PasswordStrength.medium;
+  return PasswordStrength.weak;
+}
+
+/// Converts an ISO 3166-1 alpha-2 country code to a flag emoji.
+///
+/// Uses Regional Indicator Symbol arithmetic: each letter + 0x1F1A5 maps to
+/// the corresponding Regional Indicator Symbol Letter (A–Z).
+///
+/// Examples:
+///   countryCodeToFlag("BR") → "🇧🇷"
+///   countryCodeToFlag("US") → "🇺🇸"
+///   countryCodeToFlag("PT") → "🇵🇹"
+String countryCodeToFlag(String isoCode) {
+  if (isoCode.length != 2) return '';
+  final upper = isoCode.toUpperCase();
+  final first = String.fromCharCode(upper.codeUnitAt(0) + 0x1F1A5);
+  final second = String.fromCharCode(upper.codeUnitAt(1) + 0x1F1A5);
+  return '$first$second';
+}
+
+/// Formats a lockout duration in seconds to a user-friendly Portuguese string.
+///
+/// Examples:
+///   formatLockoutDuration(45)  → "45 segundos"
+///   formatLockoutDuration(90)  → "1 minuto e 30 segundos"
+///   formatLockoutDuration(120) → "2 minutos"
+String formatLockoutDuration(int totalSeconds) {
+  if (totalSeconds <= 0) return '0 segundos';
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  if (minutes == 0) return '$totalSeconds segundo${totalSeconds == 1 ? '' : 's'}';
+  if (seconds == 0) return '$minutes minuto${minutes == 1 ? '' : 's'}';
+  return '$minutes minuto${minutes == 1 ? '' : 's'} e $seconds segundo${seconds == 1 ? '' : 's'}';
+}

@@ -35,11 +35,12 @@ class CategoryRepository {
         .toList();
   }
 
-  Future<List<CategoryItemResponseDto>> updateCategories(
-    UpdateCategoriesRequestDto requestDto,
+  Future<List<CategoryItemResponseDto>> updateCategory(
+    int id,
+    UpdateCategoryRequestDto requestDto,
   ) async {
     final response = await _dio.patch(
-      ApiEndpoints.userCategoryUpdate,
+      ApiEndpoints.userCategoryById(id),
       data: requestDto.toJson(),
     );
     return (response.data as List)

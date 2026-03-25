@@ -67,21 +67,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      final token = await ref.read(authRepositoryProvider).login(
+      final response = await ref.read(authRepositoryProvider).login(
         LoginRequestDto(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         ),
       );
       await ref.read(authNotifierProvider.notifier).onLoginSuccess(
-        accessToken: token,
-        refreshToken: '',
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
       );
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      final message = (status == 401 || status == 400)
-          ? 'E-mail ou senha incorretos.'
-          : 'Erro de servidor. Tente novamente.';
+      final String message;
+      if (status == 423) {
+        final body = e.response?.data;
+        final seconds = (body is Map ? body['remainingSeconds'] : null) as int?;
+        final minutes =
+            seconds != null ? ((seconds / 60).ceil()) : null;
+        final durationLabel = minutes != null
+            ? '$minutes minuto${minutes == 1 ? '' : 's'}'
+            : 'alguns minutos';
+        message =
+            'Conta bloqueada. Tente novamente em $durationLabel.';
+      } else if (status == 429) {
+        message =
+            'Muitas tentativas. Aguarde 15 minutos antes de tentar novamente.';
+      } else if (status == 401 || status == 400) {
+        message = 'E-mail ou senha incorretos.';
+      } else {
+        message = 'Erro de servidor. Tente novamente.';
+      }
       setState(() => _globalError = message);
     } catch (_) {
       setState(() => _globalError = 'Erro inesperado. Tente novamente.');
@@ -177,7 +193,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 10),
+
+                  // ── Forgot password link ───────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
+                      child: Text(
+                        'Esqueceu sua senha?',
+                        style: AppTextStyles.bodySm(t.primary).copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
 
                   // ── Submit button ──────────────────────────────────────────
                   _isLoading

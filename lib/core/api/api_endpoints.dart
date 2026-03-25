@@ -6,6 +6,13 @@ abstract class ApiEndpoints {
   // Auth — UserController
   static const String login = '/api/user/login';
   static const String register = '/api/user/register';
+  static const String refresh = '/api/user/refresh';
+  static const String logout = '/api/user/logout';
+  static const String forgotPassword = '/api/user/forgot-password';
+  static const String resetPassword = '/api/user/reset-password';
+  static const String verifyEmail = '/api/user/verify-email';
+  static const String userMe = '/api/user/me';
+  static const String resetData = '/api/user/me/reset-data';
 
   // Main page
   static const String mainPageSummary = '/api/mainpage/summary';
@@ -28,18 +35,30 @@ abstract class ApiEndpoints {
   static String cancelRecurringTransaction(int recurringId) =>
       '/api/transaction/$recurringId/recurring/cancel';
 
-  // Categories (transaction picker — includes system categories)
-  static const String categories = '/api/categories';
-
   // Categories (user-owned — CRUD)
   static const String userCategories = '/api/category';
   static String userCategoryById(int id) => '/api/category/$id';
-  static const String userCategoryUpdate = '/api/category';
 
   // Subcategories
   static const String subcategories = '/api/SubCategory';
   static String subcategoryById(int id) => '/api/SubCategory/$id';
   static String deleteSubcategory(int id) => '/api/SubCategory/$id';
+
+  // Currencies
+  static const String currencies = '/api/currencies';
+
+  // Banks
+  static const String banks = '/api/banks';
+
+  // Payment methods
+  static const String paymentMethods = '/api/payment-methods';
+
+  // Wishlist
+  static const String wishlist = '/api/wishlist';
+  static String wishlistById(int id) => '/api/wishlist/$id';
+  static String wishlistPrice(int id) => '/api/wishlist/$id/price';
+  static String wishlistPurchase(int id) => '/api/wishlist/$id/purchase';
+  static String wishlistPriceHistory(int id) => '/api/wishlist/$id/price-history';
 
   // Budgets
   static const String budgets = '/api/budget';

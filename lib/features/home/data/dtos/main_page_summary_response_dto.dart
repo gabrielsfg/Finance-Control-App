@@ -40,7 +40,7 @@ class BalanceSummaryDto {
 class RecentTransactionDto {
   const RecentTransactionDto({
     required this.id,
-    required this.description,
+    this.description,
     required this.value,
     required this.type,
     required this.subCategoryName,
@@ -48,7 +48,7 @@ class RecentTransactionDto {
   });
 
   final int id;
-  final String description;
+  final String? description;
   final int value;
   final String type;
   final String subCategoryName;

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../data/category_repository.dart';
+import '../data/dtos/category_response_dto.dart';
 import '../data/dtos/create_category_request_dto.dart';
 import '../data/dtos/update_category_request_dto.dart';
 import '../data/models/category.dart';
@@ -34,12 +35,14 @@ class CategoriesNotifier extends AsyncNotifier<List<Category>> {
   }
 
   Future<void> updateCategories(Map<int, String> changes) async {
-    final items = changes.entries
-        .map((e) => UpdateCategoryItemDto(id: e.key, name: e.value))
-        .toList();
-    final dtos = await ref
-        .read(categoryRepositoryProvider)
-        .updateCategories(UpdateCategoriesRequestDto(categories: items));
+    final repo = ref.read(categoryRepositoryProvider);
+    List<CategoryItemResponseDto> dtos = [];
+    for (final entry in changes.entries) {
+      dtos = await repo.updateCategory(
+        entry.key,
+        UpdateCategoryRequestDto(name: entry.value),
+      );
+    }
     state = AsyncData(dtos.map(Category.fromDto).toList());
   }
 

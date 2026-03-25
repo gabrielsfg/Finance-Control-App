@@ -9,8 +9,8 @@ class UpdateTransactionRequestDto {
     required this.accountId,
     required this.value,
     required this.transactionDate,
-    this.budgetId,
     this.description,
+    this.budgetId,
   });
 
   final int subCategoryId;
@@ -22,9 +22,10 @@ class UpdateTransactionRequestDto {
   /// Format: "YYYY-MM-DD"
   final String transactionDate;
 
+  final String? description;
+
   /// null to unlink from budget.
   final int? budgetId;
-  final String? description;
 
   Map<String, dynamic> toJson() => _$UpdateTransactionRequestDtoToJson(this);
 }

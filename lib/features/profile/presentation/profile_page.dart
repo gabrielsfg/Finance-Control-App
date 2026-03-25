@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../features/auth/data/auth_repository.dart';
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/auth/providers/user_profile_provider.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -36,6 +40,8 @@ class ProfilePage extends ConsumerWidget {
               const _AccountSection(),
               const SizedBox(height: 16),
               const _SupportSection(),
+              const SizedBox(height: 16),
+              const _DangerZoneSection(),
               const SizedBox(height: 24),
               const _LogoutButton(),
               const SizedBox(height: 12),
@@ -71,43 +77,50 @@ class _Header extends StatelessWidget {
 
 // ── Profile Card ───────────────────────────────────────────────────────────
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends ConsumerWidget {
   const _ProfileCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppThemeTokens.of(context);
+    final profileAsync = ref.watch(userProfileProvider);
+
+    final initials = profileAsync.valueOrNull?.initials ?? '?';
+    final name = profileAsync.valueOrNull?.name ?? '—';
+    final email = profileAsync.valueOrNull?.email ?? '—';
+    final memberSince = profileAsync.valueOrNull?.createdAt;
+    final memberLabel = memberSince != null
+        ? 'Member since ${memberSince.year}'
+        : '';
 
     return GlassCard(
       child: Row(
         children: [
-          const AppAvatar(initials: '?', size: 56),
+          AppAvatar(initials: initials, size: 56),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '—',
+                  name,
                   style: AppTextStyles.h3(t.txtPrimary),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '—',
+                  email,
                   style: AppTextStyles.bodySm(t.txtTertiary),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '',
+                  memberLabel,
                   style: AppTextStyles.caption(t.txtDisabled),
                 ),
               ],
             ),
           ),
           GestureDetector(
-            onTap: () {
-              // TODO: navigate to edit profile
-            },
+            onTap: () => context.push('/profile/edit'),
             child: Container(
               width: 34,
               height: 34,
@@ -281,12 +294,13 @@ class _SettingRowWidget extends StatelessWidget {
 
 // ── Preferences Section ────────────────────────────────────────────────────
 
-class _PreferencesSection extends StatelessWidget {
+class _PreferencesSection extends ConsumerWidget {
   const _PreferencesSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppThemeTokens.of(context);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,19 +321,15 @@ class _PreferencesSection extends StatelessWidget {
               icon: LucideIcons.globe,
               iconColor: const Color(0xFF06B6D4),
               label: 'Language',
-              trailingLabel: 'Português',
-              onTap: () {
-                // TODO: navigate to language settings
-              },
+              trailingLabel: profile?.preferredLanguage,
+              onTap: () => context.push('/settings'),
             ),
             _SettingRow(
               icon: LucideIcons.dollarSign,
               iconColor: const Color(0xFF22C55E),
               label: 'Currency',
-              trailingLabel: 'BRL',
-              onTap: () {
-                // TODO: navigate to currency settings
-              },
+              trailingLabel: profile?.preferredCurrency,
+              onTap: () => context.push('/settings'),
             ),
           ],
         ),
@@ -344,6 +354,13 @@ class _AccountSection extends StatelessWidget {
         _SettingsCard(
           items: [
             _SettingRow(
+              icon: LucideIcons.gift,
+              iconColor: const Color(0xFFEC4899),
+              label: 'Lista de Desejos',
+              subtitle: 'Seus itens favoritos',
+              onTap: () => context.push('/wishlist'),
+            ),
+            _SettingRow(
               icon: LucideIcons.tag,
               iconColor: const Color(0xFF8B5CF6),
               label: 'Categorias',
@@ -355,9 +372,7 @@ class _AccountSection extends StatelessWidget {
               iconColor: t.primary,
               label: 'Edit Profile',
               subtitle: 'Name, email, and password',
-              onTap: () {
-                // TODO: navigate to edit profile
-              },
+              onTap: () => context.push('/profile/edit'),
             ),
             _SettingRow(
               icon: LucideIcons.shieldCheck,
@@ -428,6 +443,183 @@ class _SupportSection extends StatelessWidget {
   }
 }
 
+// ── Danger Zone Section ────────────────────────────────────────────────────
+
+class _DangerZoneSection extends ConsumerWidget {
+  const _DangerZoneSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppThemeTokens.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(title: 'Danger Zone'),
+        _SettingsCard(
+          items: [
+            _SettingRow(
+              icon: LucideIcons.rotateCcw,
+              iconColor: const Color(0xFFF59E0B),
+              label: 'Resetar dados financeiros',
+              subtitle: 'Apaga transações, contas e orçamentos',
+              onTap: () => _showResetDataDialog(context, ref),
+            ),
+            _SettingRow(
+              icon: LucideIcons.userX,
+              iconColor: t.error,
+              label: 'Excluir minha conta',
+              subtitle: 'Ação irreversível',
+              onTap: () => _showDeleteAccountDialog(context, ref),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showResetDataDialog(BuildContext context, WidgetRef ref) async {
+    final t = AppThemeTokens.of(context);
+    final passwordController = TextEditingController();
+    String? errorMessage;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Resetar dados financeiros'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Isso irá apagar permanentemente todas as suas transações, contas, categorias, orçamentos e áreas. Sua conta será mantida.',
+                style: AppTextStyles.bodySm(t.txtSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirme sua senha',
+                  errorText: errorMessage,
+                ),
+                onChanged: (_) => setDialogState(() => errorMessage = null),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(authRepositoryProvider)
+                      .resetData(passwordController.text);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Dados financeiros apagados com sucesso.'),
+                      ),
+                    );
+                  }
+                } on DioException catch (e) {
+                  final status = e.response?.statusCode;
+                  setDialogState(() {
+                    errorMessage = status == 400
+                        ? 'Senha incorreta.'
+                        : 'Erro ao resetar dados. Tente novamente.';
+                  });
+                } catch (_) {
+                  setDialogState(
+                      () => errorMessage = 'Erro inesperado. Tente novamente.');
+                }
+              },
+              child: Text(
+                'Resetar',
+                style: TextStyle(color: const Color(0xFFF59E0B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordController.dispose();
+  }
+
+  Future<void> _showDeleteAccountDialog(
+      BuildContext context, WidgetRef ref) async {
+    final t = AppThemeTokens.of(context);
+    final passwordController = TextEditingController();
+    String? errorMessage;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Excluir minha conta'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Esta ação é irreversível. Todos os seus dados serão permanentemente excluídos.',
+                style: AppTextStyles.bodySm(t.txtSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirme sua senha',
+                  errorText: errorMessage,
+                ),
+                onChanged: (_) => setDialogState(() => errorMessage = null),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(authRepositoryProvider)
+                      .deleteAccount(passwordController.text);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  await ref.read(authNotifierProvider.notifier).logout();
+                } on DioException catch (e) {
+                  final status = e.response?.statusCode;
+                  setDialogState(() {
+                    errorMessage = status == 400
+                        ? 'Senha incorreta.'
+                        : 'Erro ao excluir conta. Tente novamente.';
+                  });
+                } catch (_) {
+                  setDialogState(
+                      () => errorMessage = 'Erro inesperado. Tente novamente.');
+                }
+              },
+              child: Text(
+                'Excluir',
+                style: TextStyle(color: t.error),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordController.dispose();
+  }
+}
+
 // ── Logout Button ──────────────────────────────────────────────────────────
 
 class _LogoutButton extends ConsumerWidget {
@@ -438,9 +630,30 @@ class _LogoutButton extends ConsumerWidget {
     final t = AppThemeTokens.of(context);
 
     return GestureDetector(
-      onTap: () {
-        // TODO: call ref.read(authNotifierProvider.notifier).logout()
-        // after auth is wired up
+      onTap: () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Log Out'),
+            content: const Text('Are you sure you want to log out?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Log Out',
+                  style: TextStyle(color: t.error),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          await ref.read(authNotifierProvider.notifier).logout();
+        }
       },
       child: Container(
         height: 48,

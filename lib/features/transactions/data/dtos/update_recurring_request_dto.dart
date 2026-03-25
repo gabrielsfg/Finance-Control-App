@@ -8,8 +8,8 @@ class UpdateRecurringRequestDto {
     required this.subCategoryId,
     required this.accountId,
     required this.value,
-    this.budgetId,
     this.description,
+    this.budgetId,
     this.endDate,
   });
 
@@ -19,9 +19,10 @@ class UpdateRecurringRequestDto {
   /// In cents.
   final int value;
 
+  final String? description;
+
   /// null to unlink from budget.
   final int? budgetId;
-  final String? description;
 
   /// Optional end date for the recurrence. Format: "YYYY-MM-DD"
   final String? endDate;

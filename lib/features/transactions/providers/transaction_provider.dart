@@ -12,55 +12,138 @@ import '../data/models/transaction_item.dart';
 import '../data/transaction_repository.dart';
 
 // ---------------------------------------------------------------------------
-// Transactions list
+// Transactions list — paginated, per-month
 // ---------------------------------------------------------------------------
 
-class TransactionsNotifier extends AsyncNotifier<List<TransactionItem>> {
+/// State for a paginated month of transactions.
+class TransactionsState {
+  const TransactionsState({
+    required this.items,
+    required this.currentPage,
+    required this.totalPages,
+    this.isLoadingMore = false,
+  });
+
+  final List<TransactionItem> items;
+  final int currentPage;
+  final int totalPages;
+  final bool isLoadingMore;
+
+  bool get hasNextPage => currentPage < totalPages;
+
+  TransactionsState copyWith({
+    List<TransactionItem>? items,
+    int? currentPage,
+    int? totalPages,
+    bool? isLoadingMore,
+  }) =>
+      TransactionsState(
+        items: items ?? this.items,
+        currentPage: currentPage ?? this.currentPage,
+        totalPages: totalPages ?? this.totalPages,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      );
+}
+
+class TransactionsNotifier extends AsyncNotifier<TransactionsState> {
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  String get _startDate =>
+      '${_month.year}-${_month.month.toString().padLeft(2, '0')}-01';
+  String get _endDate {
+    final lastDay = DateTime(_month.year, _month.month + 1, 0);
+    return '${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}';
+  }
+
   @override
-  Future<List<TransactionItem>> build() async {
-    final dtos = await ref
+  Future<TransactionsState> build() async {
+    return _fetchPage(1);
+  }
+
+  Future<TransactionsState> _fetchPage(int page) async {
+    final paged = await ref
         .read(transactionRepositoryProvider)
-        .getAllTransactions();
-    return dtos.map(TransactionItem.fromDto).toList();
+        .getTransactions(
+          page: page,
+          pageSize: 50,
+          startDate: _startDate,
+          endDate: _endDate,
+        );
+    return TransactionsState(
+      items: paged.items.map(TransactionItem.fromDto).toList(),
+      currentPage: paged.currentPage,
+      totalPages: paged.totalPages,
+    );
+  }
+
+  Future<void> loadMonth(DateTime month) async {
+    _month = DateTime(month.year, month.month);
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _fetchPage(1));
+  }
+
+  Future<void> loadNextPage() async {
+    final current = state.valueOrNull;
+    if (current == null || !current.hasNextPage || current.isLoadingMore) {
+      return;
+    }
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final paged = await ref
+          .read(transactionRepositoryProvider)
+          .getTransactions(
+            page: current.currentPage + 1,
+            pageSize: 50,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+      final newItems = paged.items.map(TransactionItem.fromDto).toList();
+      state = AsyncData(current.copyWith(
+        items: [...current.items, ...newItems],
+        currentPage: paged.currentPage,
+        totalPages: paged.totalPages,
+        isLoadingMore: false,
+      ));
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _fetchPage(1));
   }
 
   Future<void> deleteTransaction(int id) async {
-    final dtos = await ref
-        .read(transactionRepositoryProvider)
-        .deleteTransaction(id);
-    state = AsyncData(dtos.map(TransactionItem.fromDto).toList());
+    await ref.read(transactionRepositoryProvider).deleteTransaction(id);
+    await refresh();
   }
 
-  Future<void> updateTransaction(
-    int id,
-    UpdateTransactionRequestDto dto,
-  ) async {
-    final dtos = await ref
-        .read(transactionRepositoryProvider)
-        .updateTransaction(id, dto);
-    state = AsyncData(dtos.map(TransactionItem.fromDto).toList());
+  Future<void> updateTransaction(int id, UpdateTransactionRequestDto dto) async {
+    await ref.read(transactionRepositoryProvider).updateTransaction(id, dto);
+    await refresh();
   }
 
   Future<void> updateRecurringTransaction(
     int recurringId,
     UpdateRecurringRequestDto dto,
   ) async {
-    final dtos = await ref
+    await ref
         .read(transactionRepositoryProvider)
         .updateRecurringTransaction(recurringId, dto);
-    state = AsyncData(dtos.map(TransactionItem.fromDto).toList());
+    await refresh();
   }
 
   Future<void> cancelRecurringTransaction(int recurringId) async {
-    final dtos = await ref
+    await ref
         .read(transactionRepositoryProvider)
         .cancelRecurringTransaction(recurringId);
-    state = AsyncData(dtos.map(TransactionItem.fromDto).toList());
+    await refresh();
   }
 }
 
 final transactionsNotifierProvider =
-    AsyncNotifierProvider<TransactionsNotifier, List<TransactionItem>>(
+    AsyncNotifierProvider<TransactionsNotifier, TransactionsState>(
   TransactionsNotifier.new,
 );
 
